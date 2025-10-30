@@ -46,7 +46,15 @@ function runHomepageInjection() {
       try {
         console.log(`[Algolia Bundle] Found ${ANCHOR_SELECTOR}, injecting ${ELEMENT_TAG}...`);
         const newElement = document.createElement(ELEMENT_TAG);
-        anchor.appendChild(newElement);
+
+        // Insert BEFORE footer (not after)
+        const footer = document.querySelector('.store-footer');
+        if (footer) {
+          anchor.insertBefore(newElement, footer);
+        } else {
+          anchor.appendChild(newElement);  // Fallback
+        }
+
         console.log('✅ [Algolia Bundle] Homepage category component injected successfully');
         return true;
       } catch (e) {

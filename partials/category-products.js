@@ -16,14 +16,17 @@ class CategoryProductsComponent extends HTMLElement {
         };
         this.categoriesLoading = true;
         this.seenProductIds = new Set();
+        // innerHTML moved to connectedCallback to comply with Web Components spec
+    }
+
+    async connectedCallback() {
+        // Set initial loading state (safe here - element is now in DOM)
         this.innerHTML = `
             <div class="category-filter">
                 <div class="categories-loading">جارِ تحميل الفئات...</div>
             </div>
         `;
-    }
 
-    async connectedCallback() {
         try {
             await this.fetchCategoriesFromCloudRun();
             const template = this.createTemplate();

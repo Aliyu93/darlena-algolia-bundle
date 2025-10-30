@@ -379,11 +379,61 @@ function setupDynamicHandlers() {
 }
 
 /**
+ * Scan and replace existing YouTube iframes on page load
+ */
+function scanAndReplaceExistingIframes() {
+  debug('Scanning for existing YouTube iframes');
+
+  // Find all iframes in the document
+  const allIframes = document.querySelectorAll('iframe');
+  let replacedCount = 0;
+
+  allIframes.forEach(iframe => {
+    const src = iframe.src || iframe.getAttribute('src');
+
+    // Check if it's a YouTube iframe
+    if (src && YOUTUBE_REGEX.test(src)) {
+      // Don't process if already processed
+      if (iframe.dataset.ytOptIn === 'true' || iframe.hasAttribute('data-yt-processed')) {
+        return;
+      }
+
+      debug('Found existing YouTube iframe, replacing', { src, iframe });
+
+      // Stop iframe from loading
+      iframe.src = 'about:blank';
+
+      // Extract URL and create placeholder
+      const videoUrl = normalizeYoutubeUrl(src);
+      const placeholder = createPlaceholderButton(videoUrl);
+
+      // Preserve dimensions
+      if (iframe.width) placeholder.style.width = iframe.width;
+      if (iframe.height) placeholder.style.height = iframe.height;
+      if (iframe.style.width) placeholder.style.width = iframe.style.width;
+      if (iframe.style.height) placeholder.style.height = iframe.style.height;
+
+      // Bind click handler
+      placeholder.addEventListener('click', handlePlaceholderClick);
+      placeholder.setAttribute('data-click-bound', 'true');
+
+      // Replace iframe with placeholder
+      iframe.parentNode.replaceChild(placeholder, iframe);
+      initPlaceholderThumbnail(placeholder);
+      replacedCount++;
+    }
+  });
+
+  debug(`Replaced ${replacedCount} existing YouTube iframes`);
+}
+
+/**
  * Initialize on page load
  */
 function init() {
   debug('Initializing module');
   initYouTubeOptIn();
+  scanAndReplaceExistingIframes();  // Add scan for existing iframes
   setupDynamicHandlers();
 }
 

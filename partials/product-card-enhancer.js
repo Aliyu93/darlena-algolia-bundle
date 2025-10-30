@@ -56,7 +56,7 @@ const injectProductSliderStyles = () => {
     }
     .s-product-card-image {
       position: relative !important;
-      overflow: hidden;
+      overflow: visible;
     }
     .s-product-card-image > a {
       position: relative !important;
@@ -81,21 +81,6 @@ const injectProductSliderStyles = () => {
     }
     .swipe-indicator.right {
       background: linear-gradient(270deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 50%);
-    }
-    .gallery-icon {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      width: 24px;
-      height: 24px;
-      background: rgba(0,0,0,0.5);
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      z-index: 20;
-      pointer-events: none;
     }
   `;
   document.head.appendChild(style);
@@ -503,14 +488,6 @@ class CardSliderInstance {
     }
 
     this.additionalImages = additionalImages;
-
-    // Add gallery icon
-    if (this.imageContainer && !this.imageContainer.querySelector('.gallery-icon')) {
-      const galleryIcon = document.createElement('div');
-      galleryIcon.className = 'gallery-icon';
-      galleryIcon.innerHTML = '<i class="sicon-image-gallery" style="font-size: 14px;"></i>';
-      this.imageContainer.appendChild(galleryIcon);
-    }
 
     // Show dots
     const dotsContainer = this.imageWrapper.querySelector(`.product-slider-dots[data-slider-id="${this.sliderId}"]`);

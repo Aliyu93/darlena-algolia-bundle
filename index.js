@@ -14,6 +14,8 @@ import './partials/product-ranking.js';       // Registers <product-ranking> cus
 import './partials/category-products.js';     // Registers <mahaba-category-products> custom element
 import productRecommendations from './partials/product-recommendations.js';
 import './product-ranking-init.js';           // Sets up category/tag page ranking
+import './partials/youtube-lazy.js';          // YouTube lazy loading
+import './partials/product-card-enhancer.js'; // Auto-enhances product cards with image sliders
 
 // Expose globals expected by legacy theme code
 window.productRecommendations = productRecommendations;

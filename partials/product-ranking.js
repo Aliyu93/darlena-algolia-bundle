@@ -177,6 +177,9 @@ class ProductRanking extends HTMLElement {
 
         window.salla?.event?.dispatch('twilight::mutation');
 
+        // Wait for Salla to render, then reorder DOM to match Redis
+        this.applyOrderToList(this.container, this.ids);
+
         this.setupScrollListener();
     }
 
@@ -236,6 +239,9 @@ class ProductRanking extends HTMLElement {
             this.hasMore = data.hasMore !== false;
 
             window.salla?.event?.dispatch('twilight::mutation');
+
+            // Reorder this pagination batch
+            this.applyOrderToList(list, data.objectIDs);
         } catch (err) {
             this.hasMore = false;
         } finally {
@@ -249,6 +255,71 @@ class ProductRanking extends HTMLElement {
             document.addEventListener('salla::ready', resolve, {once: true});
             setTimeout(resolve, 3000);
         });
+    }
+
+    applyOrderToList(container, ids, maxAttempts = 30) {
+        if (!container || !ids || !ids.length) return;
+
+        let attempt = 0;
+        const intervalId = setInterval(() => {
+            attempt++;
+
+            // Find all product cards in this specific container
+            const cards = Array.from(container.querySelectorAll(
+                'custom-salla-product-card, .s-product-card-entry'
+            ));
+
+            // Check if we have cards rendered
+            if (cards.length > 0) {
+                clearInterval(intervalId);
+
+                // Create a map of product ID -> card element
+                const cardMap = new Map();
+                cards.forEach(card => {
+                    // Use same extraction logic as product-card-enhancer.js
+                    let productId = null;
+
+                    // Method 1: data-id attribute (PRIMARY - Salla uses this)
+                    if (card.dataset.id) {
+                        productId = card.dataset.id;
+                    }
+                    // Method 2: id attribute (if numeric)
+                    else if (card.id && !isNaN(card.id)) {
+                        productId = card.id;
+                    }
+                    // Method 3: Extract from product link URL
+                    else {
+                        const link = card.querySelector('.s-product-card-image a, .s-product-card-content-title a');
+                        if (link?.href) {
+                            const match = link.href.match(/\/product\/[^\/]+\/(\d+)/);
+                            if (match) productId = match[1];
+                        }
+                    }
+
+                    if (productId) {
+                        cardMap.set(String(productId), card);
+                    }
+                });
+
+                // Get the parent container where cards are rendered
+                const parent = cards[0].parentNode;
+                if (!parent) return;
+
+                // Reorder cards to match Redis IDs
+                ids.forEach(redisId => {
+                    const card = cardMap.get(String(redisId));
+                    if (card && parent.contains(card)) {
+                        parent.appendChild(card); // Move to end in correct order
+                    }
+                });
+
+                console.log('[PR Element] Reordered', cards.length, 'cards to match Redis order');
+            } else if (attempt >= maxAttempts) {
+                // Give up after maxAttempts * 100ms
+                clearInterval(intervalId);
+                console.warn('[PR Element] Cards never appeared, skipping reorder');
+            }
+        }, 100); // Check every 100ms
     }
 
     disconnectedCallback() {

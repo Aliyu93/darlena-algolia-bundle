@@ -105,3 +105,10 @@ onReady(() => {
 
   console.log('✅ [Algolia Bundle] Loaded successfully');
 });
+
+document.addEventListener('salla::page::changed', () => {
+  productRecommendations.reset();
+  setTimeout(() => {
+    productRecommendations.initialize();
+  }, 1000);
+});

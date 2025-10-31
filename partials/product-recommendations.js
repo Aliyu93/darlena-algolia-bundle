@@ -12,17 +12,30 @@ class ProductRecommendations {
         this.productId = null;
         this.recentlyViewedKey = 'recently_viewed_products';
         this.maxRecentProducts = 15;
+        this.recentlyViewedClass = 'algolia-recently-viewed';
     }
     
     initialize() {
-        if (this.initialized || !this.isProductPage()) return;
-        
-        this.productId = this.getProductId();
-        if (!this.productId) return;
-        
+        if (!this.isProductPage()) {
+            this.productId = null;
+            this.initialized = false;
+            return;
+        }
+
+        const currentProductId = this.getProductId();
+        if (!currentProductId) {
+            this.initialized = false;
+            return;
+        }
+
+        if (this.initialized && this.productId === currentProductId) {
+            return;
+        }
+
+        this.productId = currentProductId;
         this.initialized = true;
         this.addToRecentlyViewed(this.productId);
-        
+
         const loadComponents = () => {
             this.loadRecommendations();
             this.loadRecentlyViewed();
@@ -57,9 +70,12 @@ class ProductRecommendations {
             .filter(id => id && !isNaN(id) && id !== parseInt(this.productId, 10));
             
         if (!filteredRecent.length) return;
-        
+
+        this.removeExistingRecentlyViewed();
+
         const container = document.createElement('div');
         container.className = 'mt-8 s-products-slider-container';
+        container.classList.add(this.recentlyViewedClass);
         
         const title = document.createElement('h2');
         title.className = 'section-title mb-5 font-bold text-xl';
@@ -136,7 +152,11 @@ class ProductRecommendations {
         } catch (error) {
         }
     }
-    
+
+    removeExistingRecentlyViewed() {
+        document.querySelectorAll(`.${this.recentlyViewedClass}`).forEach(node => node.remove());
+    }
+
     getRecentlyViewed() {
         try {
             const stored = sessionStorage.getItem(this.recentlyViewedKey);
@@ -247,6 +267,12 @@ class ProductRecommendations {
         });
     }
     
+    reset() {
+        this.initialized = false;
+        this.productId = null;
+        this.removeExistingRecentlyViewed();
+    }
+
     waitForElement(selector, callback) {
         const element = document.querySelector(selector);
         if (element) {

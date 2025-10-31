@@ -891,11 +891,23 @@ var AlgoliaBundle = (() => {
       this.productId = null;
       this.recentlyViewedKey = "recently_viewed_products";
       this.maxRecentProducts = 15;
+      this.recentlyViewedClass = "algolia-recently-viewed";
     }
     initialize() {
-      if (this.initialized || !this.isProductPage()) return;
-      this.productId = this.getProductId();
-      if (!this.productId) return;
+      if (!this.isProductPage()) {
+        this.productId = null;
+        this.initialized = false;
+        return;
+      }
+      const currentProductId = this.getProductId();
+      if (!currentProductId) {
+        this.initialized = false;
+        return;
+      }
+      if (this.initialized && this.productId === currentProductId) {
+        return;
+      }
+      this.productId = currentProductId;
       this.initialized = true;
       this.addToRecentlyViewed(this.productId);
       const loadComponents = () => {
@@ -923,8 +935,10 @@ var AlgoliaBundle = (() => {
       if (!recentlyViewed.length) return;
       const filteredRecent = recentlyViewed.map((id) => parseInt(id, 10)).filter((id) => id && !isNaN(id) && id !== parseInt(this.productId, 10));
       if (!filteredRecent.length) return;
+      this.removeExistingRecentlyViewed();
       const container = document.createElement("div");
       container.className = "mt-8 s-products-slider-container";
+      container.classList.add(this.recentlyViewedClass);
       const title = document.createElement("h2");
       title.className = "section-title mb-5 font-bold text-xl";
       title.textContent = "\u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0627\u0644\u0645\u0634\u0627\u0647\u062F\u0629 \u0645\u0624\u062E\u0631\u0627\u064B";
@@ -981,6 +995,9 @@ var AlgoliaBundle = (() => {
         sessionStorage.setItem(this.recentlyViewedKey, JSON.stringify(recentlyViewed));
       } catch (error) {
       }
+    }
+    removeExistingRecentlyViewed() {
+      document.querySelectorAll(`.${this.recentlyViewedClass}`).forEach((node) => node.remove());
     }
     getRecentlyViewed() {
       try {
@@ -1069,6 +1086,11 @@ var AlgoliaBundle = (() => {
           });
         }, 200);
       });
+    }
+    reset() {
+      this.initialized = false;
+      this.productId = null;
+      this.removeExistingRecentlyViewed();
     }
     waitForElement(selector, callback) {
       const element = document.querySelector(selector);
@@ -2006,5 +2028,11 @@ var AlgoliaBundle = (() => {
       }, 3e3);
     }
     console.log("\u2705 [Algolia Bundle] Loaded successfully");
+  });
+  document.addEventListener("salla::page::changed", () => {
+    product_recommendations_default.reset();
+    setTimeout(() => {
+      product_recommendations_default.initialize();
+    }, 1e3);
   });
 })();

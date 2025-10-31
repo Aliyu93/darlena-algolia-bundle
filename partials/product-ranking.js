@@ -19,6 +19,7 @@ class ProductRanking extends HTMLElement {
     async connectedCallback() {
         const categoryId = this.getAttribute('category-id');
         const tagId = this.getAttribute('tag-id');
+        console.log('[PR Element] Connected:', {categoryId, tagId});
 
         if (!categoryId && !tagId) return;
 
@@ -27,6 +28,7 @@ class ProductRanking extends HTMLElement {
             this.setupFilterListener();
             await this.initialize(categoryId, tagId);
         } catch (err) {
+            console.error('[PR Element] Error:', err);
             this.restoreOriginalList();
         }
     }
@@ -103,6 +105,7 @@ class ProductRanking extends HTMLElement {
     }
 
     async initialize(categoryId, tagId, force = false) {
+        console.log('[PR Element] Initialize called');
         if (this.container && !this.usingSallaFilter && !force) return;
 
         const selector = categoryId
@@ -110,6 +113,7 @@ class ProductRanking extends HTMLElement {
             : 'salla-products-list[source="product.index.tag"], salla-products-list[source^="tags."]';
 
         const existingList = document.querySelector(selector);
+        console.log('[PR Element] Existing list found:', !!existingList);
         if (!existingList) {
             return;
         }
@@ -147,8 +151,10 @@ class ProductRanking extends HTMLElement {
 
         const data = await dataPromise;
         clearTimeout(this.timeout);
+        console.log('[PR Element] Redis data received:', data?.objectIDs?.length, 'products');
 
         if (!data?.objectIDs?.length) {
+            console.warn('[PR Element] No products from Redis, restoring original');
             this.restoreOriginalList();
             return;
         }

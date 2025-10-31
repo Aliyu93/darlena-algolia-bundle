@@ -8,18 +8,25 @@ let initAttempts = 0;
 const MAX_ATTEMPTS = 2;
 
 function initRanking() {
+  console.log(`[PR Init] Attempt ${initAttempts + 1}/${MAX_ATTEMPTS}`);
+
   // Prevent multiple initializations
   if (initialized) return;
 
   // Track attempts to prevent infinite retries
   initAttempts++;
-  if (initAttempts > MAX_ATTEMPTS) return;
+  if (initAttempts > MAX_ATTEMPTS) {
+    console.warn('[PR Init] Max attempts reached');
+    return;
+  }
 
   // Check for category page
   const categoryList = document.querySelector('salla-products-list[source="product.index"], salla-products-list[source="categories"]');
+  console.log('[PR Init] Category list found:', !!categoryList);
   if (categoryList) {
     const categoryId = categoryList.getAttribute('source-value');
     if (categoryId) {
+      console.log('[PR Init] ✅ Creating ranking for category:', categoryId);
       createRanking('category', categoryId);
       initialized = true;
       return;
@@ -31,6 +38,7 @@ function initRanking() {
   if (tagList) {
     const tagId = tagList.getAttribute('source-value');
     if (tagId) {
+      console.log('[PR Init] ✅ Creating ranking for tag:', tagId);
       createRanking('tag', tagId);
       initialized = true;
       return;
@@ -40,6 +48,7 @@ function initRanking() {
   // If we reach here and this is the first attempt, retry after a delay
   // This helps with slow-loading Salla components
   if (initAttempts < MAX_ATTEMPTS) {
+    console.log('[PR Init] Retrying in 800ms...');
     setTimeout(initRanking, 800);
   }
 }

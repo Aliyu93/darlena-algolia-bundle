@@ -89,6 +89,48 @@ function runHomepageInjection() {
   });
 }
 
+function runCartAddonsInjection() {
+  const ensure = () => {
+    const submitButton = document.querySelector('#cart-submit');
+    if (!submitButton) return false;
+
+    const submitWrap = submitButton.closest('.cart-submit-wrap') || submitButton.parentElement;
+    const parent = submitWrap?.parentElement || submitWrap;
+    if (!parent) return false;
+
+    if (parent.querySelector('cart-addons-slider')) {
+      return true;
+    }
+
+    const slider = document.createElement('cart-addons-slider');
+    slider.className = 'cart-addons-wrapper';
+
+    if (submitWrap && parent) {
+      parent.insertBefore(slider, submitWrap.nextSibling);
+    } else {
+      parent.appendChild(slider);
+    }
+
+    console.log('[Algolia Bundle] Injected cart addons slider');
+    return true;
+  };
+
+  if (document.querySelector('cart-addons-slider')) return;
+
+  if (ensure()) return;
+
+  const observer = new MutationObserver((mutations, obs) => {
+    if (ensure()) {
+      obs.disconnect();
+    }
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}
+
 onReady(() => {
   // 1. Homepage: Inject category products component
   runHomepageInjection();
@@ -103,6 +145,11 @@ onReady(() => {
     }, 3000);
   }
 
+  // 3. Cart page: Ensure cart addons slider exists
+  if (document.querySelector('form[id^="item-"]') || document.querySelector('#cart-submit')) {
+    setTimeout(runCartAddonsInjection, 500);
+  }
+
   console.log('✅ [Algolia Bundle] Loaded successfully');
 });
 
@@ -111,4 +158,6 @@ document.addEventListener('salla::page::changed', () => {
   setTimeout(() => {
     productRecommendations.initialize();
   }, 1000);
+
+  setTimeout(runCartAddonsInjection, 500);
 });

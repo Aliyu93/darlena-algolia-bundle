@@ -180,8 +180,10 @@ var AlgoliaBundle = (() => {
       super();
       this.initialized = false;
       this.productIds = [];
+      this.structureReady = false;
     }
     connectedCallback() {
+      this.ensureStructure();
       if (this.initialized) return;
       this.getHighestValueItemFromDOM().then((productId) => {
         if (productId) {
@@ -196,6 +198,21 @@ var AlgoliaBundle = (() => {
       }).catch((error) => {
         console.error("[CartAddonsSlider] Error loading products:", error);
       });
+    }
+    ensureStructure() {
+      if (this.structureReady) return;
+      if (!this.querySelector(".cart-addons-title")) {
+        const title = document.createElement("h3");
+        title.className = "cart-addons-title";
+        title.textContent = window.salla?.lang?.get("pages.cart.frequently_bought_together") || "Frequently bought together";
+        this.appendChild(title);
+      }
+      if (!this.querySelector(".frequently-bought-container")) {
+        const container = document.createElement("div");
+        container.className = "frequently-bought-container";
+        this.appendChild(container);
+      }
+      this.structureReady = true;
     }
     async getHighestValueItemFromDOM() {
       try {
@@ -289,9 +306,11 @@ var AlgoliaBundle = (() => {
       productsList.setAttribute("class", "s-products-list-vertical-cards");
       container.innerHTML = "";
       container.appendChild(productsList);
-      const touchIndicator = document.createElement("div");
-      touchIndicator.classList.add("touch-indicator");
-      this.appendChild(touchIndicator);
+      if (!this.querySelector(".touch-indicator")) {
+        const touchIndicator = document.createElement("div");
+        touchIndicator.classList.add("touch-indicator");
+        this.appendChild(touchIndicator);
+      }
       console.log("[CartAddonsSlider] Product list rendered");
     }
     initializeSlider() {
@@ -2018,6 +2037,38 @@ var AlgoliaBundle = (() => {
       subtree: true
     });
   }
+  function runCartAddonsInjection() {
+    const ensure = () => {
+      const submitButton = document.querySelector("#cart-submit");
+      if (!submitButton) return false;
+      const submitWrap = submitButton.closest(".cart-submit-wrap") || submitButton.parentElement;
+      const parent = submitWrap?.parentElement || submitWrap;
+      if (!parent) return false;
+      if (parent.querySelector("cart-addons-slider")) {
+        return true;
+      }
+      const slider = document.createElement("cart-addons-slider");
+      slider.className = "cart-addons-wrapper";
+      if (submitWrap && parent) {
+        parent.insertBefore(slider, submitWrap.nextSibling);
+      } else {
+        parent.appendChild(slider);
+      }
+      console.log("[Algolia Bundle] Injected cart addons slider");
+      return true;
+    };
+    if (document.querySelector("cart-addons-slider")) return;
+    if (ensure()) return;
+    const observer = new MutationObserver((mutations, obs) => {
+      if (ensure()) {
+        obs.disconnect();
+      }
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
   onReady(() => {
     runHomepageInjection();
     const isProductPage = document.querySelector('[id^="product-"]');
@@ -2027,6 +2078,9 @@ var AlgoliaBundle = (() => {
         console.log("\u2705 [Algolia Bundle] Product recommendations initialized");
       }, 3e3);
     }
+    if (document.querySelector('form[id^="item-"]') || document.querySelector("#cart-submit")) {
+      setTimeout(runCartAddonsInjection, 500);
+    }
     console.log("\u2705 [Algolia Bundle] Loaded successfully");
   });
   document.addEventListener("salla::page::changed", () => {
@@ -2034,5 +2088,6 @@ var AlgoliaBundle = (() => {
     setTimeout(() => {
       product_recommendations_default.initialize();
     }, 1e3);
+    setTimeout(runCartAddonsInjection, 500);
   });
 })();

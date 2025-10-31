@@ -5,11 +5,13 @@ class CartAddonsSlider extends HTMLElement {
         super();
         this.initialized = false;
         this.productIds = [];
+        this.structureReady = false;
     }
 
     connectedCallback() {
+        this.ensureStructure();
         if (this.initialized) return;
-        
+
         this.getHighestValueItemFromDOM()
             .then(productId => {
                 if (productId) {
@@ -26,6 +28,25 @@ class CartAddonsSlider extends HTMLElement {
             .catch(error => {
                 console.error('[CartAddonsSlider] Error loading products:', error);
             });
+    }
+
+    ensureStructure() {
+        if (this.structureReady) return;
+
+        if (!this.querySelector('.cart-addons-title')) {
+            const title = document.createElement('h3');
+            title.className = 'cart-addons-title';
+            title.textContent = window.salla?.lang?.get('pages.cart.frequently_bought_together') || 'Frequently bought together';
+            this.appendChild(title);
+        }
+
+        if (!this.querySelector('.frequently-bought-container')) {
+            const container = document.createElement('div');
+            container.className = 'frequently-bought-container';
+            this.appendChild(container);
+        }
+
+        this.structureReady = true;
     }
 
     async getHighestValueItemFromDOM() {
@@ -152,11 +173,13 @@ class CartAddonsSlider extends HTMLElement {
         
         container.innerHTML = '';
         container.appendChild(productsList);
-        
-        const touchIndicator = document.createElement('div');
-        touchIndicator.classList.add('touch-indicator');
-        this.appendChild(touchIndicator);
-        
+
+        if (!this.querySelector('.touch-indicator')) {
+            const touchIndicator = document.createElement('div');
+            touchIndicator.classList.add('touch-indicator');
+            this.appendChild(touchIndicator);
+        }
+
         console.log('[CartAddonsSlider] Product list rendered');
     }
 

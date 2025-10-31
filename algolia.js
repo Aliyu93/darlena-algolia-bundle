@@ -1,12 +1,640 @@
-(()=>{var S=class{constructor(){this.baseUrl="https://me-central2-gtm-5v2mhn4-mwvlm.cloudfunctions.net/function-2",this.maxRetries=2,this.headers={Accept:"application/json","Cache-Control":"public, max-age=3600"},this.cache=new Map,this.fallbackEnabled=!0}async getProducts(t,e,s=0,i=12){if(!e)return null;let r=`${t}:${e}:${s}:${i}`;if(this.cache.has(r))return this.cache.get(r);let o=t==="category"?"catID":"tagID",c=t==="category"?"categoryById":"tagById",a=`${this.baseUrl}/?type=${c}&${o}=${encodeURIComponent(e)}&offset=${s}&limit=${i}`,d=null;try{let l=new AbortController,g=setTimeout(()=>l.abort(),2e3),p=await fetch(a,{method:"GET",headers:this.headers,signal:l.signal});if(clearTimeout(g),!p.ok)throw new Error(`HTTP error: ${p.status}`);if(d=await p.json(),d?.objectIDs?.length)return this.cache.set(r,d),d}catch{}if(!d?.objectIDs?.length&&this.fallbackEnabled)try{let l=await fetch(a,{method:"GET",headers:this.headers});if(l.ok&&(d=await l.json(),d?.objectIDs?.length))return this.cache.set(r,d),d}catch{}return d||{objectIDs:[],hasMore:!1}}async getRecommendations(t){if(!t)return[];let e=`recommendations:${t}`;if(this.cache.has(e))return this.cache.get(e);let s=`${this.baseUrl}/?type=recommendations&objectID=${encodeURIComponent(t)}`;try{let i=new AbortController,r=setTimeout(()=>i.abort(),3e3),o=await fetch(s,{method:"GET",headers:this.headers,signal:i.signal});if(clearTimeout(r),!o.ok)return[];let c=await o.json(),a=Array.isArray(c?.relatedProductIDs)?c.relatedProductIDs:[];return this.cache.set(e,a),a}catch{return[]}}async getFrequentlyBought(t){if(!t)return[];let e=`frequently-bought:${t}`;if(this.cache.has(e))return this.cache.get(e);let s=`${this.baseUrl}/?type=frequentlyBought&objectID=${encodeURIComponent(t)}`;try{let i=new AbortController,r=setTimeout(()=>i.abort(),3e3),o=await fetch(s,{method:"GET",headers:this.headers,signal:i.signal});if(clearTimeout(r),!o.ok)return[];let c=await o.json(),a=Array.isArray(c?.frequentlyBoughtIDs)?c.frequentlyBoughtIDs:[];return this.cache.set(e,a),a}catch{return[]}}async getCategoriesFromRedis(){let t="all-categories";if(this.cache.has(t))return this.cache.get(t);try{let e=new AbortController,s=setTimeout(()=>e.abort(),5e3),i=await fetch(`${this.baseUrl}/?type=categories`,{method:"GET",headers:this.headers,signal:e.signal});if(clearTimeout(s),!i.ok)return[];let o=(await i.json()).categories||[];return this.cache.set(t,o),o}catch{return[]}}async getGlobalProducts(t=0,e=12){let s=`global-products:${t}:${e}`;if(this.cache.has(s))return this.cache.get(s);try{let i=new AbortController,r=setTimeout(()=>i.abort(),3e3),o=`${this.baseUrl}/?type=categoryById&catID=trending-now&offset=${t}&limit=${e}`,c=await fetch(o,{method:"GET",headers:this.headers,signal:i.signal});if(clearTimeout(r),!c.ok)return{objectIDs:[],hasMore:!1};let a=await c.json(),d={objectIDs:a.objectIDs||[],hasMore:a.hasMore||!1};return this.cache.set(s,d),d}catch{return{objectIDs:[],hasMore:!1}}}async getCategoryPageById(t,e=0,s=12){return this.getProducts("category",t,e,s)}async getCategoryProducts(t,e,s){return this.getProducts("category",t,e,s)}async getTagProducts(t,e,s){return this.getProducts("tag",t,e,s)}},h=new S;var D=class extends HTMLElement{constructor(){super(),this.initialized=!1,this.productIds=[]}connectedCallback(){this.initialized||this.getHighestValueItemFromDOM().then(t=>t?this.fetchFrequentlyBoughtProducts(t):[]).then(()=>{this.renderProductList(),setTimeout(()=>{this.initializeSlider()},1e3)}).catch(t=>{console.error("[CartAddonsSlider] Error loading products:",t)})}async getHighestValueItemFromDOM(){try{let t=document.querySelectorAll('form[id^="item-"]');if(!t||t.length===0)return console.log("[CartAddonsSlider] No cart items found in DOM"),null;let e=null,s=0;return t.forEach(i=>{try{let r=i.getAttribute("id")||"",o=r.replace("item-",""),c=i.querySelector('a[href*="/p"]');if(!c){console.log("[CartAddonsSlider] No product link found in form",r);return}let a=c.getAttribute("href"),d=a.match(/\/p(\d+)(?:$|\/|\?)/);if(!d||!d[1]){console.log("[CartAddonsSlider] Could not extract product ID from URL",a);return}let l=d[1],g=i.querySelector(".item-total");if(g){let O=(g.textContent||g.innerText||"0").replace(/[^\d.,٠١٢٣٤٥٦٧٨٩]/g,"").replace(/٠/g,"0").replace(/١/g,"1").replace(/٢/g,"2").replace(/٣/g,"3").replace(/٤/g,"4").replace(/٥/g,"5").replace(/٦/g,"6").replace(/٧/g,"7").replace(/٨/g,"8").replace(/٩/g,"9"),f=parseFloat(O.replace(",","."))||0;console.log(`[CartAddonsSlider] Item ${o}: Product ID ${l}, Total: ${f}`),!isNaN(f)&&f>s&&(s=f,e={itemId:o,productId:l,total:f})}}catch(r){console.error("[CartAddonsSlider] Error processing item form:",r)}}),e?(console.log("[CartAddonsSlider] Highest value item:",e),e.productId):null}catch(t){return console.error("[CartAddonsSlider] Error extracting cart data from DOM:",t),null}}async fetchFrequentlyBoughtProducts(t){try{console.log("[CartAddonsSlider] Fetching frequently bought products for:",t);let e=await h.getFrequentlyBought(t);return e&&e.length>0?(console.log("[CartAddonsSlider] Found frequently bought products:",e),this.productIds=e.map(s=>String(s)).slice(0,8),this.productIds):(console.log("[CartAddonsSlider] No frequently bought products found"),this.productIds=[],[])}catch(e){return console.error("[CartAddonsSlider] Error fetching frequently bought products:",e),this.productIds=[],[]}}renderProductList(){if(!this.productIds||this.productIds.length===0){console.log("[CartAddonsSlider] No products to render, hiding component"),this.style.display="none";return}console.log("[CartAddonsSlider] Rendering product list with IDs:",this.productIds);let t=this.querySelector(".frequently-bought-container");if(!t){console.error("[CartAddonsSlider] Container not found");return}let e=document.createElement("salla-products-list");e.setAttribute("source","selected"),e.setAttribute("loading","lazy"),e.setAttribute("source-value",JSON.stringify(this.productIds)),e.setAttribute("class","s-products-list-vertical-cards"),t.innerHTML="",t.appendChild(e);let s=document.createElement("div");s.classList.add("touch-indicator"),this.appendChild(s),console.log("[CartAddonsSlider] Product list rendered")}initializeSlider(){try{let t=this.querySelector("salla-products-list");if(!t){console.log("[CartAddonsSlider] Products list not found");return}t.style.opacity="1",window.salla?.event?.dispatch&&window.salla.event.dispatch("twilight::mutation"),this.initialized=!0,console.log("[CartAddonsSlider] Slider initialized")}catch(t){console.error("[CartAddonsSlider] Failed to initialize cart addons slider:",t)}}};customElements.get("cart-addons-slider")||(customElements.define("cart-addons-slider",D),console.log("[CartAddonsSlider] Custom element defined"));var E=class extends HTMLElement{constructor(){super(),this.page=0,this.loading=!1,this.hasMore=!0,this.ids=[],this.container=null,this.originalList=null,this.usingSallaFilter=!1,this.timeout=null}async connectedCallback(){let t=this.getAttribute("category-id"),e=this.getAttribute("tag-id");if(console.log("[PR Element] Connected:",{categoryId:t,tagId:e}),!(!t&&!e))try{await this.waitForSalla(),this.setupFilterListener(),await this.initialize(t,e)}catch(s){console.error("[PR Element] Error:",s),this.restoreOriginalList()}}restoreOriginalList(){if(!this.originalList||this.usingSallaFilter)return;let t=document.querySelector(".ranked-products, salla-products-list[filter]"),e=t?.parentNode||this.originalList.parentNode;t&&t.remove(),this.container&&(this.container.remove(),this.container=null),e&&!e.querySelector("salla-products-list")&&(e.appendChild(this.originalList.cloneNode(!0)),window.salla?.event?.dispatch("twilight::mutation"))}setupFilterListener(){document.addEventListener("change",t=>{if(t.target.id!=="product-filter")return;let e=t.target.value;e==="ourSuggest"&&this.usingSallaFilter?this.applyRedisRanking():e!=="ourSuggest"&&this.applySallaFilter(e)})}async applySallaFilter(t){let e=this.getAttribute("category-id"),s=this.getAttribute("tag-id");if(!this.originalList)return;let i=document.querySelector(".ranked-products, salla-products-list[filter]"),r=i?.parentNode||this.container?.parentNode;if(!r)return;i&&i.remove(),this.container&&(this.container.remove(),this.container=null),this.cleanupScrollListener(),this.usingSallaFilter=!0;let o=this.originalList.cloneNode(!0);o.setAttribute("filter",t),r.appendChild(o),window.salla?.event?.dispatch("twilight::mutation")}async applyRedisRanking(){let t=this.getAttribute("category-id"),e=this.getAttribute("tag-id");this.usingSallaFilter=!1,await this.initialize(t,e,!0)}async initialize(t,e,s=!1){if(console.log("[PR Element] Initialize called"),this.container&&!this.usingSallaFilter&&!s)return;let i=t?'salla-products-list[source="product.index"], salla-products-list[source="categories"]':'salla-products-list[source="product.index.tag"], salla-products-list[source^="tags."]',r=document.querySelector(i);if(console.log("[PR Element] Existing list found:",!!r),!r)return;this.originalList||(this.originalList=r.cloneNode(!0));let o=document.getElementById("product-filter");if(o)o.value="ourSuggest",this.usingSallaFilter=!1;else if(o&&o.value!=="ourSuggest"&&!s){this.usingSallaFilter=!0;return}let c=t?h.getCategoryProducts(t,0,12):h.getTagProducts(e,0,12),a=r.parentNode;this.container=document.createElement("div"),this.container.className="ranked-products",a.insertBefore(this.container,r),clearTimeout(this.timeout),this.timeout=setTimeout(()=>{(!this.ids||!this.ids.length)&&this.restoreOriginalList()},2500);let d=await c;if(clearTimeout(this.timeout),console.log("[PR Element] Redis data received:",d?.objectIDs?.length,"products"),!d?.objectIDs?.length){console.warn("[PR Element] No products from Redis, restoring original"),this.restoreOriginalList();return}this.ids=d.objectIDs,this.page=0,this.hasMore=!0,this.usingSallaFilter=!1;let l=document.createElement("salla-products-list");l.setAttribute("source","selected"),l.setAttribute("source-value",JSON.stringify(this.ids)),l.setAttribute("limit",this.ids.length),l.className=r.className||"w-full",this.container.appendChild(l),r.remove(),window.salla?.event?.dispatch("twilight::mutation"),this.setupScrollListener()}setupScrollListener(){this.cleanupScrollListener(),this._boundScrollHandler=this.handleScroll.bind(this),window.addEventListener("scroll",this._boundScrollHandler)}cleanupScrollListener(){this._boundScrollHandler&&(window.removeEventListener("scroll",this._boundScrollHandler),this._boundScrollHandler=null)}handleScroll(){if(this.loading||!this.hasMore||this.usingSallaFilter)return;let t=window.scrollY+window.innerHeight,e=document.documentElement.scrollHeight*.5;t>e&&this.loadMore()}async loadMore(){if(!(this.loading||!this.hasMore)){this.loading=!0;try{let t=this.page+1,e=t*12,s=this.getAttribute("category-id"),i=this.getAttribute("tag-id"),r=s?await h.getCategoryProducts(s,e,12):await h.getTagProducts(i,e,12);if(!r?.objectIDs?.length){this.hasMore=!1;return}let o=document.createElement("salla-products-list");o.setAttribute("source","selected"),o.setAttribute("source-value",JSON.stringify(r.objectIDs)),o.setAttribute("limit",r.objectIDs.length),o.className="w-full",this.container.appendChild(o),this.page=t,this.hasMore=r.hasMore!==!1,window.salla?.event?.dispatch("twilight::mutation")}catch{this.hasMore=!1}finally{this.loading=!1}}}async waitForSalla(){if(!window.salla)return new Promise(t=>{document.addEventListener("salla::ready",t,{once:!0}),setTimeout(t,3e3)})}disconnectedCallback(){this.cleanupScrollListener(),clearTimeout(this.timeout)}};customElements.get("product-ranking")||customElements.define("product-ranking",E);var C=class extends HTMLElement{constructor(){super(),this.state={productsPerPage:30,categories:[],trendingCategory:{name:"\u0631\u0627\u0626\u062C \u0627\u0644\u0627\u0646",slug:"trending-now",filter:null,hasSubcats:!1,url:null}},this.categoriesLoading=!0,this.seenProductIds=new Set}async connectedCallback(){this.innerHTML=`
+var AlgoliaBundle = (() => {
+  // services/redis-service.js
+  var RedisService = class {
+    constructor() {
+      this.baseUrl = "https://me-central2-gtm-5v2mhn4-mwvlm.cloudfunctions.net/function-2";
+      this.maxRetries = 2;
+      this.headers = {
+        "Accept": "application/json",
+        "Cache-Control": "public, max-age=3600"
+      };
+      this.cache = /* @__PURE__ */ new Map();
+      this.fallbackEnabled = true;
+    }
+    async getProducts(type, id, offset = 0, limit = 12) {
+      if (!id) return null;
+      const cacheKey = `${type}:${id}:${offset}:${limit}`;
+      if (this.cache.has(cacheKey)) {
+        return this.cache.get(cacheKey);
+      }
+      const param = type === "category" ? "catID" : "tagID";
+      const endpoint = type === "category" ? "categoryById" : "tagById";
+      const url = `${this.baseUrl}/?type=${endpoint}&${param}=${encodeURIComponent(id)}&offset=${offset}&limit=${limit}`;
+      let data = null;
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2e3);
+        const response = await fetch(url, {
+          method: "GET",
+          headers: this.headers,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!response.ok) {
+          throw new Error(`HTTP error: ${response.status}`);
+        }
+        data = await response.json();
+        if (data?.objectIDs?.length) {
+          this.cache.set(cacheKey, data);
+          return data;
+        }
+      } catch (error) {
+      }
+      if (!data?.objectIDs?.length && this.fallbackEnabled) {
+        try {
+          const response = await fetch(url, {
+            method: "GET",
+            headers: this.headers
+          });
+          if (response.ok) {
+            data = await response.json();
+            if (data?.objectIDs?.length) {
+              this.cache.set(cacheKey, data);
+              return data;
+            }
+          }
+        } catch (retryError) {
+        }
+      }
+      return data || { objectIDs: [], hasMore: false };
+    }
+    async getRecommendations(productId) {
+      if (!productId) return [];
+      const cacheKey = `recommendations:${productId}`;
+      if (this.cache.has(cacheKey)) {
+        return this.cache.get(cacheKey);
+      }
+      const url = `${this.baseUrl}/?type=recommendations&objectID=${encodeURIComponent(productId)}`;
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3e3);
+        const response = await fetch(url, {
+          method: "GET",
+          headers: this.headers,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!response.ok) return [];
+        const data = await response.json();
+        const recommendations = Array.isArray(data?.relatedProductIDs) ? data.relatedProductIDs : [];
+        this.cache.set(cacheKey, recommendations);
+        return recommendations;
+      } catch {
+        return [];
+      }
+    }
+    async getFrequentlyBought(productId) {
+      if (!productId) return [];
+      const cacheKey = `frequently-bought:${productId}`;
+      if (this.cache.has(cacheKey)) {
+        return this.cache.get(cacheKey);
+      }
+      const url = `${this.baseUrl}/?type=frequentlyBought&objectID=${encodeURIComponent(productId)}`;
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3e3);
+        const response = await fetch(url, {
+          method: "GET",
+          headers: this.headers,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!response.ok) return [];
+        const data = await response.json();
+        const frequentlyBought = Array.isArray(data?.frequentlyBoughtIDs) ? data.frequentlyBoughtIDs : [];
+        this.cache.set(cacheKey, frequentlyBought);
+        return frequentlyBought;
+      } catch {
+        return [];
+      }
+    }
+    async getCategoriesFromRedis() {
+      const cacheKey = "all-categories";
+      if (this.cache.has(cacheKey)) {
+        return this.cache.get(cacheKey);
+      }
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5e3);
+        const response = await fetch(`${this.baseUrl}/?type=categories`, {
+          method: "GET",
+          headers: this.headers,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!response.ok) {
+          return [];
+        }
+        const data = await response.json();
+        const categories = data.categories || [];
+        this.cache.set(cacheKey, categories);
+        return categories;
+      } catch (error) {
+        return [];
+      }
+    }
+    async getGlobalProducts(offset = 0, limit = 12) {
+      const cacheKey = `global-products:${offset}:${limit}`;
+      if (this.cache.has(cacheKey)) {
+        return this.cache.get(cacheKey);
+      }
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3e3);
+        const url = `${this.baseUrl}/?type=categoryById&catID=trending-now&offset=${offset}&limit=${limit}`;
+        const response = await fetch(url, {
+          method: "GET",
+          headers: this.headers,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!response.ok) {
+          return { objectIDs: [], hasMore: false };
+        }
+        const data = await response.json();
+        const result = {
+          objectIDs: data.objectIDs || [],
+          hasMore: data.hasMore || false
+        };
+        this.cache.set(cacheKey, result);
+        return result;
+      } catch (error) {
+        return { objectIDs: [], hasMore: false };
+      }
+    }
+    async getCategoryPageById(categoryId, offset = 0, limit = 12) {
+      return this.getProducts("category", categoryId, offset, limit);
+    }
+    async getCategoryProducts(categoryId, offset, limit) {
+      return this.getProducts("category", categoryId, offset, limit);
+    }
+    async getTagProducts(tagId, offset, limit) {
+      return this.getProducts("tag", tagId, offset, limit);
+    }
+  };
+  var redisService = new RedisService();
+
+  // components/CartAddonsSlider.js
+  var CartAddonsSlider = class extends HTMLElement {
+    constructor() {
+      super();
+      this.initialized = false;
+      this.productIds = [];
+    }
+    connectedCallback() {
+      if (this.initialized) return;
+      this.getHighestValueItemFromDOM().then((productId) => {
+        if (productId) {
+          return this.fetchFrequentlyBoughtProducts(productId);
+        }
+        return [];
+      }).then(() => {
+        this.renderProductList();
+        setTimeout(() => {
+          this.initializeSlider();
+        }, 1e3);
+      }).catch((error) => {
+        console.error("[CartAddonsSlider] Error loading products:", error);
+      });
+    }
+    async getHighestValueItemFromDOM() {
+      try {
+        const cartItemForms = document.querySelectorAll('form[id^="item-"]');
+        if (!cartItemForms || cartItemForms.length === 0) {
+          console.log("[CartAddonsSlider] No cart items found in DOM");
+          return null;
+        }
+        let highestValueItem = null;
+        let highestValue = 0;
+        cartItemForms.forEach((form) => {
+          try {
+            const formId = form.getAttribute("id") || "";
+            const itemId = formId.replace("item-", "");
+            const productLink = form.querySelector('a[href*="/p"]');
+            if (!productLink) {
+              console.log("[CartAddonsSlider] No product link found in form", formId);
+              return;
+            }
+            const productUrl = productLink.getAttribute("href");
+            const productIdMatch = productUrl.match(/\/p(\d+)(?:$|\/|\?)/);
+            if (!productIdMatch || !productIdMatch[1]) {
+              console.log("[CartAddonsSlider] Could not extract product ID from URL", productUrl);
+              return;
+            }
+            const productId = productIdMatch[1];
+            const totalElement = form.querySelector(".item-total");
+            if (totalElement) {
+              const totalText = totalElement.textContent || totalElement.innerText || "0";
+              const cleanedText = totalText.replace(/[^\d.,٠١٢٣٤٥٦٧٨٩]/g, "").replace(/٠/g, "0").replace(/١/g, "1").replace(/٢/g, "2").replace(/٣/g, "3").replace(/٤/g, "4").replace(/٥/g, "5").replace(/٦/g, "6").replace(/٧/g, "7").replace(/٨/g, "8").replace(/٩/g, "9");
+              const totalValue = parseFloat(cleanedText.replace(",", ".")) || 0;
+              console.log(`[CartAddonsSlider] Item ${itemId}: Product ID ${productId}, Total: ${totalValue}`);
+              if (!isNaN(totalValue) && totalValue > highestValue) {
+                highestValue = totalValue;
+                highestValueItem = {
+                  itemId,
+                  productId,
+                  total: totalValue
+                };
+              }
+            }
+          } catch (err) {
+            console.error("[CartAddonsSlider] Error processing item form:", err);
+          }
+        });
+        if (highestValueItem) {
+          console.log("[CartAddonsSlider] Highest value item:", highestValueItem);
+          return highestValueItem.productId;
+        }
+        return null;
+      } catch (error) {
+        console.error("[CartAddonsSlider] Error extracting cart data from DOM:", error);
+        return null;
+      }
+    }
+    async fetchFrequentlyBoughtProducts(productId) {
+      try {
+        console.log("[CartAddonsSlider] Fetching frequently bought products for:", productId);
+        const productIds = await redisService.getFrequentlyBought(productId);
+        if (productIds && productIds.length > 0) {
+          console.log("[CartAddonsSlider] Found frequently bought products:", productIds);
+          this.productIds = productIds.map((id) => String(id)).slice(0, 8);
+          return this.productIds;
+        } else {
+          console.log("[CartAddonsSlider] No frequently bought products found");
+          this.productIds = [];
+          return [];
+        }
+      } catch (error) {
+        console.error("[CartAddonsSlider] Error fetching frequently bought products:", error);
+        this.productIds = [];
+        return [];
+      }
+    }
+    renderProductList() {
+      if (!this.productIds || this.productIds.length === 0) {
+        console.log("[CartAddonsSlider] No products to render, hiding component");
+        this.style.display = "none";
+        return;
+      }
+      console.log("[CartAddonsSlider] Rendering product list with IDs:", this.productIds);
+      const container = this.querySelector(".frequently-bought-container");
+      if (!container) {
+        console.error("[CartAddonsSlider] Container not found");
+        return;
+      }
+      const productsList = document.createElement("salla-products-list");
+      productsList.setAttribute("source", "selected");
+      productsList.setAttribute("loading", "lazy");
+      productsList.setAttribute("source-value", JSON.stringify(this.productIds));
+      productsList.setAttribute("class", "s-products-list-vertical-cards");
+      container.innerHTML = "";
+      container.appendChild(productsList);
+      const touchIndicator = document.createElement("div");
+      touchIndicator.classList.add("touch-indicator");
+      this.appendChild(touchIndicator);
+      console.log("[CartAddonsSlider] Product list rendered");
+    }
+    initializeSlider() {
+      try {
+        const productsList = this.querySelector("salla-products-list");
+        if (!productsList) {
+          console.log("[CartAddonsSlider] Products list not found");
+          return;
+        }
+        productsList.style.opacity = "1";
+        if (window.salla?.event?.dispatch) {
+          window.salla.event.dispatch("twilight::mutation");
+        }
+        this.initialized = true;
+        console.log("[CartAddonsSlider] Slider initialized");
+      } catch (error) {
+        console.error("[CartAddonsSlider] Failed to initialize cart addons slider:", error);
+      }
+    }
+  };
+  if (!customElements.get("cart-addons-slider")) {
+    customElements.define("cart-addons-slider", CartAddonsSlider);
+    console.log("[CartAddonsSlider] Custom element defined");
+  }
+
+  // partials/product-ranking.js
+  var ProductRanking = class extends HTMLElement {
+    constructor() {
+      super();
+      this.page = 0;
+      this.loading = false;
+      this.hasMore = true;
+      this.ids = [];
+      this.container = null;
+      this.originalList = null;
+      this.usingSallaFilter = false;
+      this.timeout = null;
+    }
+    async connectedCallback() {
+      const categoryId = this.getAttribute("category-id");
+      const tagId = this.getAttribute("tag-id");
+      console.log("[PR Element] Connected:", { categoryId, tagId });
+      if (!categoryId && !tagId) return;
+      try {
+        await this.waitForSalla();
+        this.setupFilterListener();
+        await this.initialize(categoryId, tagId);
+      } catch (err) {
+        console.error("[PR Element] Error:", err);
+        this.restoreOriginalList();
+      }
+    }
+    // Restore original list if redis fails
+    restoreOriginalList() {
+      if (!this.originalList || this.usingSallaFilter) return;
+      const currentList = document.querySelector(".ranked-products, salla-products-list[filter]");
+      const parent = currentList?.parentNode || this.originalList.parentNode;
+      if (currentList) currentList.remove();
+      if (this.container) {
+        this.container.remove();
+        this.container = null;
+      }
+      if (parent && !parent.querySelector("salla-products-list")) {
+        parent.appendChild(this.originalList.cloneNode(true));
+        window.salla?.event?.dispatch("twilight::mutation");
+      }
+    }
+    setupFilterListener() {
+      document.addEventListener("change", (e) => {
+        if (e.target.id !== "product-filter") return;
+        const value = e.target.value;
+        if (value === "ourSuggest" && this.usingSallaFilter) {
+          this.applyRedisRanking();
+        } else if (value !== "ourSuggest") {
+          this.applySallaFilter(value);
+        }
+      });
+    }
+    async applySallaFilter(filterValue) {
+      const categoryId = this.getAttribute("category-id");
+      const tagId = this.getAttribute("tag-id");
+      if (!this.originalList) {
+        return;
+      }
+      const currentList = document.querySelector(".ranked-products, salla-products-list[filter]");
+      const parent = currentList?.parentNode || this.container?.parentNode;
+      if (!parent) return;
+      if (currentList) currentList.remove();
+      if (this.container) {
+        this.container.remove();
+        this.container = null;
+      }
+      this.cleanupScrollListener();
+      this.usingSallaFilter = true;
+      const list = this.originalList.cloneNode(true);
+      list.setAttribute("filter", filterValue);
+      parent.appendChild(list);
+      window.salla?.event?.dispatch("twilight::mutation");
+    }
+    async applyRedisRanking() {
+      const categoryId = this.getAttribute("category-id");
+      const tagId = this.getAttribute("tag-id");
+      this.usingSallaFilter = false;
+      await this.initialize(categoryId, tagId, true);
+    }
+    async initialize(categoryId, tagId, force = false) {
+      console.log("[PR Element] Initialize called");
+      if (this.container && !this.usingSallaFilter && !force) return;
+      const selector = categoryId ? 'salla-products-list[source="product.index"], salla-products-list[source="categories"]' : 'salla-products-list[source="product.index.tag"], salla-products-list[source^="tags."]';
+      const existingList = document.querySelector(selector);
+      console.log("[PR Element] Existing list found:", !!existingList);
+      if (!existingList) {
+        return;
+      }
+      if (!this.originalList) {
+        this.originalList = existingList.cloneNode(true);
+      }
+      const filter = document.getElementById("product-filter");
+      if (filter) {
+        filter.value = "ourSuggest";
+        this.usingSallaFilter = false;
+      } else if (filter && filter.value !== "ourSuggest" && !force) {
+        this.usingSallaFilter = true;
+        return;
+      }
+      const dataPromise = categoryId ? redisService.getCategoryProducts(categoryId, 0, 12) : redisService.getTagProducts(tagId, 0, 12);
+      const parent = existingList.parentNode;
+      this.container = document.createElement("div");
+      this.container.className = "ranked-products";
+      parent.insertBefore(this.container, existingList);
+      clearTimeout(this.timeout);
+      this.timeout = setTimeout(() => {
+        if (!this.ids || !this.ids.length) {
+          this.restoreOriginalList();
+        }
+      }, 2500);
+      const data = await dataPromise;
+      clearTimeout(this.timeout);
+      console.log("[PR Element] Redis data received:", data?.objectIDs?.length, "products");
+      console.log("[PR Element] Redis product IDs:", data.objectIDs);
+      if (!data?.objectIDs?.length) {
+        console.warn("[PR Element] No products from Redis, restoring original");
+        this.restoreOriginalList();
+        return;
+      }
+      this.ids = data.objectIDs;
+      this.page = 0;
+      this.hasMore = true;
+      this.usingSallaFilter = false;
+      const list = document.createElement("salla-products-list");
+      list.setAttribute("source", "selected");
+      list.setAttribute("source-value", JSON.stringify(this.ids));
+      list.setAttribute("limit", this.ids.length);
+      list.className = existingList.className || "w-full";
+      this.container.appendChild(list);
+      existingList.remove();
+      window.salla?.event?.dispatch("twilight::mutation");
+      this.setupScrollListener();
+    }
+    setupScrollListener() {
+      this.cleanupScrollListener();
+      this._boundScrollHandler = this.handleScroll.bind(this);
+      window.addEventListener("scroll", this._boundScrollHandler);
+    }
+    cleanupScrollListener() {
+      if (this._boundScrollHandler) {
+        window.removeEventListener("scroll", this._boundScrollHandler);
+        this._boundScrollHandler = null;
+      }
+    }
+    handleScroll() {
+      if (this.loading || !this.hasMore || this.usingSallaFilter) return;
+      const scrolled = window.scrollY + window.innerHeight;
+      const threshold = document.documentElement.scrollHeight * 0.5;
+      if (scrolled > threshold) {
+        this.loadMore();
+      }
+    }
+    async loadMore() {
+      if (this.loading || !this.hasMore) return;
+      this.loading = true;
+      try {
+        const nextPage = this.page + 1;
+        const offset = nextPage * 12;
+        const categoryId = this.getAttribute("category-id");
+        const tagId = this.getAttribute("tag-id");
+        const data = categoryId ? await redisService.getCategoryProducts(categoryId, offset, 12) : await redisService.getTagProducts(tagId, offset, 12);
+        if (!data?.objectIDs?.length) {
+          this.hasMore = false;
+          return;
+        }
+        const list = document.createElement("salla-products-list");
+        list.setAttribute("source", "selected");
+        list.setAttribute("source-value", JSON.stringify(data.objectIDs));
+        list.setAttribute("limit", data.objectIDs.length);
+        list.className = "w-full";
+        this.container.appendChild(list);
+        this.page = nextPage;
+        this.hasMore = data.hasMore !== false;
+        window.salla?.event?.dispatch("twilight::mutation");
+      } catch (err) {
+        this.hasMore = false;
+      } finally {
+        this.loading = false;
+      }
+    }
+    async waitForSalla() {
+      if (window.salla) return;
+      return new Promise((resolve) => {
+        document.addEventListener("salla::ready", resolve, { once: true });
+        setTimeout(resolve, 3e3);
+      });
+    }
+    disconnectedCallback() {
+      this.cleanupScrollListener();
+      clearTimeout(this.timeout);
+    }
+  };
+  customElements.get("product-ranking") || customElements.define("product-ranking", ProductRanking);
+
+  // partials/category-products.js
+  var CategoryProductsComponent = class extends HTMLElement {
+    constructor() {
+      super();
+      this.state = {
+        productsPerPage: 30,
+        categories: [],
+        trendingCategory: {
+          name: "\u0631\u0627\u0626\u062C \u0627\u0644\u0627\u0646",
+          slug: "trending-now",
+          filter: null,
+          hasSubcats: false,
+          url: null
+        }
+      };
+      this.categoriesLoading = true;
+      this.seenProductIds = /* @__PURE__ */ new Set();
+    }
+    async connectedCallback() {
+      this.innerHTML = `
             <div class="category-filter">
                 <div class="categories-loading">\u062C\u0627\u0631\u0650 \u062A\u062D\u0645\u064A\u0644 \u0627\u0644\u0641\u0626\u0627\u062A...</div>
             </div>
-        `;try{await this.fetchCategoriesFromCloudRun();let t=this.createTemplate();this.innerHTML=t,await this.initializeCategorySections()}catch(t){this.handleInitError(t)}}disconnectedCallback(){}async fetchCategoriesFromCloudRun(){let t={228327271:{name:"\u062C\u0645\u064A\u0639 \u0627\u0644\u0639\u0628\u0627\u064A\u0627\u062A",url:"https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA/c228327271"},476899183:{name:"\u062C\u0644\u0627\u0628\u064A\u0627\u062A",url:"https://darlena.com/%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A7%D8%AA/c476899183"},1466412179:{name:"\u062C\u062F\u064A\u062F\u0646\u0627",url:"https://darlena.com/%D8%AC%D8%AF%D9%8A%D8%AF-%D8%AF%D8%A7%D8%B1-%D9%84%D9%8A%D9%86%D8%A7/c1466412179"},289250285:{name:"\u0639\u0628\u0627\u064A\u0627\u062A \u0643\u0644\u0648\u0634",url:"https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D9%83%D9%84%D9%88%D8%B4/c289250285"},1891285357:{name:"\u0639\u0628\u0627\u064A\u0627\u062A \u0633\u0648\u062F\u0627\u0621 \u0633\u0627\u062F\u0629",url:"https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D8%B3%D9%88%D8%AF%D8%A7%D8%A1-%D8%B3%D8%A7%D8%AF%D8%A9/c1891285357"},2132455494:{name:"\u0639\u0628\u0627\u064A\u0627\u062A \u0645\u0644\u0648\u0646\u0629",url:"https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D9%85%D9%84%D9%88%D9%86%D8%A9/c2132455494"},940975465:{name:"\u0639\u0628\u0627\u064A\u0627\u062A \u0628\u062C\u064A\u0648\u0628",url:"https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D8%A8%D8%AC%D9%8A%D9%88%D8%A8/c940975465"},1567146102:{name:"\u0639\u0628\u0627\u064A\u0627\u062A \u0628\u0634\u062A",url:"https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D8%A8%D8%B4%D8%AA/c1567146102"},832995956:{name:"\u0639\u0628\u0627\u064A\u0627\u062A \u0645\u0637\u0631\u0632\u0629",url:"https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D9%85%D8%B7%D8%B1%D8%B2%D8%A9/c832995956"},2031226480:{name:"\u0639\u0628\u0627\u064A\u0627\u062A \u0631\u0623\u0633",url:"https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D8%B1%D8%A3%D8%B3/c2031226480"},1122348775:{name:"\u0639\u0628\u0627\u064A\u0627\u062A \u0635\u064A\u0641\u064A\u0629",url:"https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D8%B5%D9%8A%D9%81%D9%8A%D8%A9/c1122348775"},692927841:{name:"\u0637\u0631\u062D",url:"https://darlena.com/%D8%B7%D8%B1%D8%AD/c692927841"},639447590:{name:"\u0646\u0642\u0627\u0628\u0627\u062A",url:"https://darlena.com/%D9%86%D9%82%D8%A7%D8%A8%D8%A7%D8%AA/c639447590"},114756598:{name:"\u0639\u0628\u0627\u064A\u0627\u062A \u0634\u064A\u0641\u0648\u0646",url:"https://darlena.com/%D8%B4%D9%8A%D9%81%D9%88%D9%86/c114756598"}},e={"\u0631\u0627\u0626\u062C \u0627\u0644\u0627\u0646":1,\u062C\u062F\u064A\u062F\u0646\u0627:2,"\u0639\u0628\u0627\u064A\u0627\u062A \u0635\u064A\u0641\u064A\u0629":3,"\u062C\u0645\u064A\u0639 \u0627\u0644\u0639\u0628\u0627\u064A\u0627\u062A":4,"\u0639\u0628\u0627\u064A\u0627\u062A \u0643\u0644\u0648\u0634":5,\u062C\u0644\u0627\u0628\u064A\u0627\u062A:6,"\u0639\u0628\u0627\u064A\u0627\u062A \u0634\u064A\u0641\u0648\u0646":7,"\u0639\u0628\u0627\u064A\u0627\u062A \u0633\u0648\u062F\u0627\u0621 \u0633\u0627\u062F\u0629":8,"\u0639\u0628\u0627\u064A\u0627\u062A \u0628\u062C\u064A\u0648\u0628":9,"\u0639\u0628\u0627\u064A\u0627\u062A \u0628\u0634\u062A":10,"\u0639\u0628\u0627\u064A\u0627\u062A \u0645\u0637\u0631\u0632\u0629":11,"\u0639\u0628\u0627\u064A\u0627\u062A \u0631\u0623\u0633":12,"\u0639\u0628\u0627\u064A\u0627\u062A \u0645\u0644\u0648\u0646\u0629":13,\u0637\u0631\u062D:14,\u0646\u0642\u0627\u0628\u0627\u062A:15};try{let s=await h.getCategoriesFromRedis();if(!Array.isArray(s))throw new Error("Categories data is not an array");let i=s.map(r=>({slug:r.name,name:r.name,filter:r.name,hasSubcats:!1,count:r.count||0,ids:r.ids||(r.id?[r.id]:[])}));i=i.filter(r=>{if(r.ids.length>0){let o=Number(r.ids[0]);return t.hasOwnProperty(o)}return!1}).map(r=>{let o=Number(r.ids[0]);return{...r,name:t[o].name,slug:t[o].name.toLowerCase().replace(/\s+/g,"-"),url:t[o].url,ids:r.ids}}),i.sort((r,o)=>{let c=e[r.name]||999,a=e[o.name]||999;return c-a}),i.unshift({...this.state.trendingCategory}),this.state.categories=i}catch(s){throw this.state.categories=[{...this.state.trendingCategory}],s}finally{this.categoriesLoading=!1}}createTemplate(){return this.categoriesLoading?`
+        `;
+      try {
+        await this.fetchCategoriesFromCloudRun();
+        const template = this.createTemplate();
+        this.innerHTML = template;
+        await this.initializeCategorySections();
+      } catch (error) {
+        this.handleInitError(error);
+      }
+    }
+    disconnectedCallback() {
+    }
+    async fetchCategoriesFromCloudRun() {
+      const allowedCategories = {
+        228327271: { name: "\u062C\u0645\u064A\u0639 \u0627\u0644\u0639\u0628\u0627\u064A\u0627\u062A", url: "https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA/c228327271" },
+        476899183: { name: "\u062C\u0644\u0627\u0628\u064A\u0627\u062A", url: "https://darlena.com/%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A7%D8%AA/c476899183" },
+        1466412179: { name: "\u062C\u062F\u064A\u062F\u0646\u0627", url: "https://darlena.com/%D8%AC%D8%AF%D9%8A%D8%AF-%D8%AF%D8%A7%D8%B1-%D9%84%D9%8A%D9%86%D8%A7/c1466412179" },
+        289250285: { name: "\u0639\u0628\u0627\u064A\u0627\u062A \u0643\u0644\u0648\u0634", url: "https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D9%83%D9%84%D9%88%D8%B4/c289250285" },
+        1891285357: { name: "\u0639\u0628\u0627\u064A\u0627\u062A \u0633\u0648\u062F\u0627\u0621 \u0633\u0627\u062F\u0629", url: "https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D8%B3%D9%88%D8%AF%D8%A7%D8%A1-%D8%B3%D8%A7%D8%AF%D8%A9/c1891285357" },
+        2132455494: { name: "\u0639\u0628\u0627\u064A\u0627\u062A \u0645\u0644\u0648\u0646\u0629", url: "https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D9%85%D9%84%D9%88%D9%86%D8%A9/c2132455494" },
+        940975465: { name: "\u0639\u0628\u0627\u064A\u0627\u062A \u0628\u062C\u064A\u0648\u0628", url: "https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D8%A8%D8%AC%D9%8A%D9%88%D8%A8/c940975465" },
+        1567146102: { name: "\u0639\u0628\u0627\u064A\u0627\u062A \u0628\u0634\u062A", url: "https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D8%A8%D8%B4%D8%AA/c1567146102" },
+        832995956: { name: "\u0639\u0628\u0627\u064A\u0627\u062A \u0645\u0637\u0631\u0632\u0629", url: "https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D9%85%D8%B7%D8%B1%D8%B2%D8%A9/c832995956" },
+        2031226480: { name: "\u0639\u0628\u0627\u064A\u0627\u062A \u0631\u0623\u0633", url: "https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D8%B1%D8%A3%D8%B3/c2031226480" },
+        1122348775: { name: "\u0639\u0628\u0627\u064A\u0627\u062A \u0635\u064A\u0641\u064A\u0629", url: "https://darlena.com/%D8%B9%D8%A8%D8%A7%D9%8A%D8%A7%D8%AA-%D8%B5%D9%8A%D9%81%D9%8A%D8%A9/c1122348775" },
+        692927841: { name: "\u0637\u0631\u062D", url: "https://darlena.com/%D8%B7%D8%B1%D8%AD/c692927841" },
+        639447590: { name: "\u0646\u0642\u0627\u0628\u0627\u062A", url: "https://darlena.com/%D9%86%D9%82%D8%A7%D8%A8%D8%A7%D8%AA/c639447590" },
+        114756598: { name: "\u0639\u0628\u0627\u064A\u0627\u062A \u0634\u064A\u0641\u0648\u0646", url: "https://darlena.com/%D8%B4%D9%8A%D9%81%D9%88%D9%86/c114756598" }
+      };
+      const priorityOrder = {
+        "\u0631\u0627\u0626\u062C \u0627\u0644\u0627\u0646": 1,
+        "\u062C\u062F\u064A\u062F\u0646\u0627": 2,
+        "\u0639\u0628\u0627\u064A\u0627\u062A \u0635\u064A\u0641\u064A\u0629": 3,
+        "\u062C\u0645\u064A\u0639 \u0627\u0644\u0639\u0628\u0627\u064A\u0627\u062A": 4,
+        "\u0639\u0628\u0627\u064A\u0627\u062A \u0643\u0644\u0648\u0634": 5,
+        "\u062C\u0644\u0627\u0628\u064A\u0627\u062A": 6,
+        "\u0639\u0628\u0627\u064A\u0627\u062A \u0634\u064A\u0641\u0648\u0646": 7,
+        "\u0639\u0628\u0627\u064A\u0627\u062A \u0633\u0648\u062F\u0627\u0621 \u0633\u0627\u062F\u0629": 8,
+        "\u0639\u0628\u0627\u064A\u0627\u062A \u0628\u062C\u064A\u0648\u0628": 9,
+        "\u0639\u0628\u0627\u064A\u0627\u062A \u0628\u0634\u062A": 10,
+        "\u0639\u0628\u0627\u064A\u0627\u062A \u0645\u0637\u0631\u0632\u0629": 11,
+        "\u0639\u0628\u0627\u064A\u0627\u062A \u0631\u0623\u0633": 12,
+        "\u0639\u0628\u0627\u064A\u0627\u062A \u0645\u0644\u0648\u0646\u0629": 13,
+        "\u0637\u0631\u062D": 14,
+        "\u0646\u0642\u0627\u0628\u0627\u062A": 15
+      };
+      try {
+        const categories = await redisService.getCategoriesFromRedis();
+        if (!Array.isArray(categories)) {
+          throw new Error("Categories data is not an array");
+        }
+        let dynamicCats = categories.map((cat) => ({
+          slug: cat.name,
+          name: cat.name,
+          filter: cat.name,
+          hasSubcats: false,
+          count: cat.count || 0,
+          ids: cat.ids || (cat.id ? [cat.id] : [])
+        }));
+        dynamicCats = dynamicCats.filter((cat) => {
+          if (cat.ids.length > 0) {
+            const id = Number(cat.ids[0]);
+            return allowedCategories.hasOwnProperty(id);
+          }
+          return false;
+        }).map((cat) => {
+          const id = Number(cat.ids[0]);
+          return {
+            ...cat,
+            name: allowedCategories[id].name,
+            slug: allowedCategories[id].name.toLowerCase().replace(/\s+/g, "-"),
+            url: allowedCategories[id].url,
+            ids: cat.ids
+          };
+        });
+        dynamicCats.sort((a, b) => {
+          const aRank = priorityOrder[a.name] || 999;
+          const bRank = priorityOrder[b.name] || 999;
+          return aRank - bRank;
+        });
+        dynamicCats.unshift({
+          ...this.state.trendingCategory
+        });
+        this.state.categories = dynamicCats;
+      } catch (error) {
+        this.state.categories = [{ ...this.state.trendingCategory }];
+        throw error;
+      } finally {
+        this.categoriesLoading = false;
+      }
+    }
+    createTemplate() {
+      if (this.categoriesLoading) {
+        return `
                 <div class="category-filter">
                     <div class="categories-loading">\u062C\u0627\u0631\u0650 \u062A\u062D\u0645\u064A\u0644 \u0627\u0644\u0641\u0626\u0627\u062A...</div>
                 </div>
-            `:`
+            `;
+      }
+      const template = `
             <style>
                 .category-filter {
                     max-width: 1280px;
@@ -92,30 +720,268 @@
                 }
             </style>
             <div class="category-filter">
-                ${this.state.categories.map(e=>`
-                    <div class="category-section" data-category="${e.slug}">
+                ${this.state.categories.map((category) => `
+                    <div class="category-section" data-category="${category.slug}">
                         <div class="category-header">
-                            ${e.url?`<a href="${e.url}" class="view-all">
+                            ${category.url ? `<a href="${category.url}" class="view-all">
                                      <i class="sicon-keyboard_arrow_left"></i>
                                      \u0645\u0634\u0627\u0647\u062F\u0629 \u0627\u0644\u0643\u0644
                                      <i class="sicon-keyboard_arrow_right"></i>
-                                   </a>`:""}
-                            <h2 class="category-title">${e.name}</h2>
+                                   </a>` : ""}
+                            <h2 class="category-title">${category.name}</h2>
                         </div>
-                        <div id="products-${e.slug}">
+                        <div id="products-${category.slug}">
                             <div class="slider-loading" style="text-align: center; padding: 1rem;">\u062C\u0627\u0631 \u062A\u062D\u0645\u064A\u0644 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A...</div>
                         </div>
                     </div>
                 `).join("")}
             </div>
-        `}async initializeCategorySections(){try{let t=this.state.categories.map(r=>r.slug==="trending-now"?h.getGlobalProducts(0,this.state.productsPerPage).then(o=>({slug:r.slug,ids:o.objectIDs||[]})).catch(o=>({slug:r.slug,ids:[],error:o})):r.ids&&r.ids.length>0?this.fetchRegularCategory(r).then(o=>({slug:r.slug,ids:o||[]})).catch(o=>({slug:r.slug,ids:[],error:o})):Promise.resolve({slug:r.slug,ids:[]})),s=(await Promise.all(t)).reduce((r,o)=>(r[o.slug]=o.ids,r),{});this.seenProductIds.clear();let i={};for(let r of this.state.categories){let o=s[r.slug]||[],c=[];for(let a of o)if(!this.seenProductIds.has(a)&&(this.seenProductIds.add(a),c.push(a),c.length>=6))break;i[r.slug]=c}this.renderProductSliders(i)}catch(t){this.handleInitError(t)}}async fetchRegularCategory(t){let e=t.ids.map(s=>h.getCategoryPageById(s,0,this.state.productsPerPage).catch(i=>({objectIDs:[]})));try{return(await Promise.all(e)).flatMap(i=>i&&i.objectIDs?i.objectIDs:[])}catch{return[]}}renderProductSliders(t){this.state.categories.forEach(e=>{let s=e.slug,i=t[s]||[],r=this.querySelector(`#products-${s}`);if(r)if(r.innerHTML="",i.length>0){let o=document.createElement("salla-products-slider");o.setAttribute("source","selected"),o.setAttribute("source-value",JSON.stringify(i)),o.setAttribute("limit",String(i.length)),o.setAttribute("slider-id",`slider-${s}`),o.setAttribute("block-title"," "),o.setAttribute("arrows","true"),o.setAttribute("rtl","true"),r.appendChild(o),setTimeout(()=>{o.querySelectorAll(".s-product-card-content-sub").forEach(a=>{a.children.length>1&&(a.style.display="flex",a.style.alignItems="center",a.style.justifyContent="space-between",a.style.flexWrap="nowrap",a.style.width="100%",a.style.overflow="visible")})},500)}else r.innerHTML='<div style="text-align: center; padding: 1rem;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u0646\u062A\u062C\u0627\u062A \u0644\u0639\u0631\u0636\u0647\u0627 \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u0641\u0626\u0629.</div>'})}handleInitError(t){this.innerHTML=`
+        `;
+      return template;
+    }
+    async initializeCategorySections() {
+      try {
+        const categoryPromises = this.state.categories.map((category) => {
+          if (category.slug === "trending-now") {
+            return redisService.getGlobalProducts(0, this.state.productsPerPage).then((result) => ({ slug: category.slug, ids: result.objectIDs || [] })).catch((error) => ({ slug: category.slug, ids: [], error }));
+          } else if (category.ids && category.ids.length > 0) {
+            return this.fetchRegularCategory(category).then((ids) => ({ slug: category.slug, ids: ids || [] })).catch((error) => ({ slug: category.slug, ids: [], error }));
+          } else {
+            return Promise.resolve({ slug: category.slug, ids: [] });
+          }
+        });
+        const results = await Promise.all(categoryPromises);
+        const fetchedIDsMap = results.reduce((acc, result) => {
+          acc[result.slug] = result.ids;
+          return acc;
+        }, {});
+        this.seenProductIds.clear();
+        const uniqueIDsPerCategory = {};
+        for (const category of this.state.categories) {
+          const fetchedIDs = fetchedIDsMap[category.slug] || [];
+          const uniqueIDs = [];
+          for (const pid of fetchedIDs) {
+            if (!this.seenProductIds.has(pid)) {
+              this.seenProductIds.add(pid);
+              uniqueIDs.push(pid);
+              if (uniqueIDs.length >= 6) break;
+            }
+          }
+          uniqueIDsPerCategory[category.slug] = uniqueIDs;
+        }
+        this.renderProductSliders(uniqueIDsPerCategory);
+      } catch (error) {
+        this.handleInitError(error);
+      }
+    }
+    async fetchRegularCategory(catObj) {
+      const categoryIdFetches = catObj.ids.map(
+        (numericID) => redisService.getCategoryPageById(numericID, 0, this.state.productsPerPage).catch((error) => {
+          return { objectIDs: [] };
+        })
+      );
+      try {
+        const results = await Promise.all(categoryIdFetches);
+        return results.flatMap((data) => data && data.objectIDs ? data.objectIDs : []);
+      } catch (error) {
+        return [];
+      }
+    }
+    renderProductSliders(uniqueIDsPerCategory) {
+      this.state.categories.forEach((category) => {
+        const categorySlug = category.slug;
+        const uniqueIDs = uniqueIDsPerCategory[categorySlug] || [];
+        const container = this.querySelector(`#products-${categorySlug}`);
+        if (!container) {
+          return;
+        }
+        container.innerHTML = "";
+        if (uniqueIDs.length > 0) {
+          const slider = document.createElement("salla-products-slider");
+          slider.setAttribute("source", "selected");
+          slider.setAttribute("source-value", JSON.stringify(uniqueIDs));
+          slider.setAttribute("limit", String(uniqueIDs.length));
+          slider.setAttribute("slider-id", `slider-${categorySlug}`);
+          slider.setAttribute("block-title", " ");
+          slider.setAttribute("arrows", "true");
+          slider.setAttribute("rtl", "true");
+          container.appendChild(slider);
+          setTimeout(() => {
+            const pricingElements = slider.querySelectorAll(".s-product-card-content-sub");
+            pricingElements.forEach((pricing) => {
+              if (pricing.children.length > 1) {
+                pricing.style.display = "flex";
+                pricing.style.alignItems = "center";
+                pricing.style.justifyContent = "space-between";
+                pricing.style.flexWrap = "nowrap";
+                pricing.style.width = "100%";
+                pricing.style.overflow = "visible";
+              }
+            });
+          }, 500);
+        } else {
+          container.innerHTML = '<div style="text-align: center; padding: 1rem;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u0646\u062A\u062C\u0627\u062A \u0644\u0639\u0631\u0636\u0647\u0627 \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u0641\u0626\u0629.</div>';
+        }
+      });
+    }
+    handleInitError(error) {
+      this.innerHTML = `
             <div class="category-filter">
                 <div class="error-message" style="color: #e53e3e; text-align: center; padding: 2rem; margin-top: 2rem;">
                     \u0639\u0630\u0631\u0627\u064B\u060C \u062D\u062F\u062B \u062E\u0637\u0623 \u0623\u062B\u0646\u0627\u0621 \u062A\u062D\u0645\u064A\u0644 \u0627\u0644\u0641\u0626\u0627\u062A. \u064A\u0631\u062C\u0649 \u062A\u062D\u062F\u064A\u062B \u0627\u0644\u0635\u0641\u062D\u0629.
-                    ${t?"<br><small>Error details logged.</small>":""}
+                    ${error ? "<br><small>Error details logged.</small>" : ""}
                 </div>
             </div>
-        `}};customElements.get("mahaba-category-products")||customElements.define("mahaba-category-products",C);var L=class{constructor(){this.initialized=!1,this.productId=null,this.recentlyViewedKey="recently_viewed_products",this.maxRecentProducts=15}initialize(){if(this.initialized||!this.isProductPage()||(this.productId=this.getProductId(),!this.productId))return;this.initialized=!0,this.addToRecentlyViewed(this.productId);let t=()=>{this.loadRecommendations(),this.loadRecentlyViewed()};document.readyState==="complete"||document.readyState==="interactive"?t():document.addEventListener("DOMContentLoaded",t)}loadRecommendations(){let t=document.querySelector('salla-products-slider[source="related"]');t?this.replaceRelatedProducts(t):this.waitForElement('salla-products-slider[source="related"]',e=>{this.replaceRelatedProducts(e)})}loadRecentlyViewed(){let t=this.getRecentlyViewed();if(!t.length)return;let e=t.map(c=>parseInt(c,10)).filter(c=>c&&!isNaN(c)&&c!==parseInt(this.productId,10));if(!e.length)return;let s=document.createElement("div");s.className="mt-8 s-products-slider-container";let i=document.createElement("h2");i.className="section-title mb-5 font-bold text-xl",i.textContent="\u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0627\u0644\u0645\u0634\u0627\u0647\u062F\u0629 \u0645\u0624\u062E\u0631\u0627\u064B",s.appendChild(i);let r=document.createElement("salla-products-slider");r.setAttribute("source","selected"),r.setAttribute("source-value",JSON.stringify(e)),r.setAttribute("autoplay","false"),r.setAttribute("class","product-recommendations-slider");let o=document.querySelector('salla-products-slider[source="related"], salla-products-slider[source="selected"]');r.setAttribute("display-style",o?.getAttribute("display-style")||"normal"),s.appendChild(r),this.insertRecentlyViewedSection(s,o),window.salla?.event?.dispatch("twilight::mutation"),this.setupStockFilter(r)}insertRecentlyViewedSection(t,e){let s=document.querySelector(".product-details, .product-entry, #product-entry");if(s&&s.parentNode)return s.parentNode.insertBefore(t,s.nextSibling),!0;if(e){let r=e.closest(".s-products-slider-container");if(r&&r.parentNode)return r.parentNode.insertBefore(t,r.nextSibling),!0;if(e.parentNode)return e.parentNode.insertBefore(t,e.nextSibling),!0}let i=document.querySelector("main, .s-product-page-content, #content, .s-product-page");return i?(i.appendChild(t),!0):(document.body.appendChild(t),!0)}addToRecentlyViewed(t){if(t)try{let e=parseInt(t,10);if(isNaN(e))return;let s=this.getRecentlyViewed();s=s.map(i=>parseInt(i,10)).filter(i=>!isNaN(i)),s=s.filter(i=>i!==e),s.unshift(e),s.length>this.maxRecentProducts&&(s=s.slice(0,this.maxRecentProducts)),sessionStorage.setItem(this.recentlyViewedKey,JSON.stringify(s))}catch{}}getRecentlyViewed(){try{let t=sessionStorage.getItem(this.recentlyViewedKey);return t?JSON.parse(t):[]}catch{return[]}}isProductPage(){return!!document.querySelector('[id^="product-"], .sidebar .details-slider')}getProductId(){let t=document.querySelector('[id^="product-"]');if(t){let s=t.id.replace("product-",""),i=parseInt(s,10);if(!isNaN(i))return i}let e=window.location.pathname.match(/\/p(\d+)/);if(e?.[1]){let s=parseInt(e[1],10);if(!isNaN(s))return s}return null}async replaceRelatedProducts(t){try{let e=await h.getRecommendations(this.productId);if(!e?.length)return;let s=e.map(r=>parseInt(r,10)).filter(r=>r&&!isNaN(r));if(!s.length)return;let i=document.createElement("salla-products-slider");if(Array.from(t.attributes).forEach(r=>{r.name!=="source-value"&&i.setAttribute(r.name,r.value)}),i.setAttribute("source","selected"),i.setAttribute("source-value",JSON.stringify(s)),i.setAttribute("class","product-recommendations-slider"),t.parentNode.replaceChild(i,t),!document.getElementById("product-recommendations-styles")){let r=document.createElement("style");r.id="product-recommendations-styles",r.textContent=`
+        `;
+    }
+  };
+  if (!customElements.get("mahaba-category-products")) {
+    customElements.define("mahaba-category-products", CategoryProductsComponent);
+  }
+
+  // partials/product-recommendations.js
+  var ProductRecommendations = class {
+    constructor() {
+      this.initialized = false;
+      this.productId = null;
+      this.recentlyViewedKey = "recently_viewed_products";
+      this.maxRecentProducts = 15;
+    }
+    initialize() {
+      if (this.initialized || !this.isProductPage()) return;
+      this.productId = this.getProductId();
+      if (!this.productId) return;
+      this.initialized = true;
+      this.addToRecentlyViewed(this.productId);
+      const loadComponents = () => {
+        this.loadRecommendations();
+        this.loadRecentlyViewed();
+      };
+      if (document.readyState === "complete" || document.readyState === "interactive") {
+        loadComponents();
+      } else {
+        document.addEventListener("DOMContentLoaded", loadComponents);
+      }
+    }
+    loadRecommendations() {
+      const relatedSection = document.querySelector('salla-products-slider[source="related"]');
+      if (relatedSection) {
+        this.replaceRelatedProducts(relatedSection);
+      } else {
+        this.waitForElement('salla-products-slider[source="related"]', (el) => {
+          this.replaceRelatedProducts(el);
+        });
+      }
+    }
+    loadRecentlyViewed() {
+      const recentlyViewed = this.getRecentlyViewed();
+      if (!recentlyViewed.length) return;
+      const filteredRecent = recentlyViewed.map((id) => parseInt(id, 10)).filter((id) => id && !isNaN(id) && id !== parseInt(this.productId, 10));
+      if (!filteredRecent.length) return;
+      const container = document.createElement("div");
+      container.className = "mt-8 s-products-slider-container";
+      const title = document.createElement("h2");
+      title.className = "section-title mb-5 font-bold text-xl";
+      title.textContent = "\u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0627\u0644\u0645\u0634\u0627\u0647\u062F\u0629 \u0645\u0624\u062E\u0631\u0627\u064B";
+      container.appendChild(title);
+      const recentSlider = document.createElement("salla-products-slider");
+      recentSlider.setAttribute("source", "selected");
+      recentSlider.setAttribute("source-value", JSON.stringify(filteredRecent));
+      recentSlider.setAttribute("autoplay", "false");
+      recentSlider.setAttribute("class", "product-recommendations-slider");
+      const relatedSection = document.querySelector('salla-products-slider[source="related"], salla-products-slider[source="selected"]');
+      recentSlider.setAttribute("display-style", relatedSection?.getAttribute("display-style") || "normal");
+      container.appendChild(recentSlider);
+      this.insertRecentlyViewedSection(container, relatedSection);
+      window.salla?.event?.dispatch("twilight::mutation");
+      this.setupStockFilter(recentSlider);
+    }
+    insertRecentlyViewedSection(container, relatedSection) {
+      const productDetails = document.querySelector(".product-details, .product-entry, #product-entry");
+      if (productDetails && productDetails.parentNode) {
+        productDetails.parentNode.insertBefore(container, productDetails.nextSibling);
+        return true;
+      }
+      if (relatedSection) {
+        const relatedContainer = relatedSection.closest(".s-products-slider-container");
+        if (relatedContainer && relatedContainer.parentNode) {
+          relatedContainer.parentNode.insertBefore(container, relatedContainer.nextSibling);
+          return true;
+        }
+        if (relatedSection.parentNode) {
+          relatedSection.parentNode.insertBefore(container, relatedSection.nextSibling);
+          return true;
+        }
+      }
+      const mainContent = document.querySelector("main, .s-product-page-content, #content, .s-product-page");
+      if (mainContent) {
+        mainContent.appendChild(container);
+        return true;
+      }
+      document.body.appendChild(container);
+      return true;
+    }
+    addToRecentlyViewed(productId) {
+      if (!productId) return;
+      try {
+        const numericId = parseInt(productId, 10);
+        if (isNaN(numericId)) return;
+        let recentlyViewed = this.getRecentlyViewed();
+        recentlyViewed = recentlyViewed.map((id) => parseInt(id, 10)).filter((id) => !isNaN(id));
+        recentlyViewed = recentlyViewed.filter((id) => id !== numericId);
+        recentlyViewed.unshift(numericId);
+        if (recentlyViewed.length > this.maxRecentProducts) {
+          recentlyViewed = recentlyViewed.slice(0, this.maxRecentProducts);
+        }
+        sessionStorage.setItem(this.recentlyViewedKey, JSON.stringify(recentlyViewed));
+      } catch (error) {
+      }
+    }
+    getRecentlyViewed() {
+      try {
+        const stored = sessionStorage.getItem(this.recentlyViewedKey);
+        return stored ? JSON.parse(stored) : [];
+      } catch {
+        return [];
+      }
+    }
+    isProductPage() {
+      return !!document.querySelector('[id^="product-"], .sidebar .details-slider');
+    }
+    getProductId() {
+      const productContainer = document.querySelector('[id^="product-"]');
+      if (productContainer) {
+        const id = productContainer.id.replace("product-", "");
+        const numericId = parseInt(id, 10);
+        if (!isNaN(numericId)) return numericId;
+      }
+      const urlMatch = window.location.pathname.match(/\/p(\d+)/);
+      if (urlMatch?.[1]) {
+        const numericId = parseInt(urlMatch[1], 10);
+        if (!isNaN(numericId)) return numericId;
+      }
+      return null;
+    }
+    async replaceRelatedProducts(element) {
+      try {
+        const recommendedIds = await redisService.getRecommendations(this.productId);
+        if (!recommendedIds?.length) return;
+        const numericIds = recommendedIds.map((id) => parseInt(id, 10)).filter((id) => id && !isNaN(id));
+        if (!numericIds.length) return;
+        const newSlider = document.createElement("salla-products-slider");
+        Array.from(element.attributes).forEach((attr) => {
+          if (attr.name !== "source-value") {
+            newSlider.setAttribute(attr.name, attr.value);
+          }
+        });
+        newSlider.setAttribute("source", "selected");
+        newSlider.setAttribute("source-value", JSON.stringify(numericIds));
+        newSlider.setAttribute("class", "product-recommendations-slider");
+        element.parentNode.replaceChild(newSlider, element);
+        if (!document.getElementById("product-recommendations-styles")) {
+          const styleEl = document.createElement("style");
+          styleEl.id = "product-recommendations-styles";
+          styleEl.textContent = `
                     .product-recommendations-slider .swiper-slide,
                     salla-products-slider[source="selected"] .swiper-slide {
                         width: 47% !important;
@@ -132,7 +998,422 @@
                             width: 24% !important;
                         }
                     }
-                `,document.head.appendChild(r)}window.salla?.event?.dispatch("twilight::mutation"),this.setupStockFilter(i)}catch{}}setupStockFilter(t){window.salla?.event?.on("salla-products-slider::products.fetched",e=>{t.contains(e.target)&&setTimeout(()=>{let s=t.querySelectorAll(".s-product-card-entry");if(!s.length)return;let i=0,r=15;s.forEach(o=>{o.classList.contains("s-product-card-out-of-stock")||i>=r?o.style.display="none":i++})},200)})}waitForElement(t,e){let s=document.querySelector(t);if(s){e(s);return}let i=new MutationObserver(()=>{let r=document.querySelector(t);r&&(i.disconnect(),e(r))});i.observe(document.body,{childList:!0,subtree:!0})}},H=new L,x=H;var b=!1,y=0,P=2;function w(){if(console.log(`[PR Init] Attempt ${y+1}/${P}`),b)return;if(y++,y>P){console.warn("[PR Init] Max attempts reached");return}let n=document.querySelector('salla-products-list[source="product.index"], salla-products-list[source="categories"]');if(console.log("[PR Init] Category list found:",!!n),n){let e=n.getAttribute("source-value");if(e){console.log("[PR Init] \u2705 Creating ranking for category:",e),R("category",e),b=!0;return}}let t=document.querySelector('salla-products-list[source="product.index.tag"], salla-products-list[source^="tags."]');if(t){let e=t.getAttribute("source-value");if(e){console.log("[PR Init] \u2705 Creating ranking for tag:",e),R("tag",e),b=!0;return}}y<P&&(console.log("[PR Init] Retrying in 800ms..."),setTimeout(w,800))}function R(n,t){if(document.querySelector(`product-ranking[${n}-id="${t}"]`))return;let e=document.createElement("product-ranking");e.setAttribute(`${n}-id`,t),document.body.appendChild(e)}document.addEventListener("salla::page::changed",()=>{b=!1,y=0,document.querySelectorAll("product-ranking").forEach(n=>n.remove()),setTimeout(w,100)});document.readyState==="loading"?document.addEventListener("DOMContentLoaded",w):(w(),document.addEventListener("salla::ready",()=>{b||setTimeout(w,100)}));var j="[YouTube Opt-In]",u=(...n)=>console.log(j,...n),T=/\/\/(www\.)?(youtube\.com|youtube-nocookie\.com|youtu\.be)\//i;function A(n){if(!n)return"";let t=k(n);return t?`https://www.youtube.com/embed/${t}`:n.split("?")[0]}function k(n){if(!n)return null;let t=[/youtube\.com\/embed\/([^?&/]+)/,/youtube-nocookie\.com\/embed\/([^?&/]+)/,/youtube\.com\/v\/([^?&/]+)/,/youtube\.com\/watch\?v=([^&]+)/,/youtu\.be\/([^?&/]+)/,/youtube\.com\/shorts\/([^?&/]+)/];for(let e of t){let s=n.match(e);if(s&&s[1])return s[1]}return null}function I(n,t={}){let e=document.createElement("button");e.type="button",e.className="yt-placeholder",e.setAttribute("data-yt-src",n),e.setAttribute("aria-label","Play YouTube video");let s=t.videoId||k(n),r=t.thumbnailUrl||(s?`https://i.ytimg.com/vi/${s}/hqdefault.jpg`:null);if(r){let c=document.createElement("img");c.className="yt-placeholder__thumb",c.alt=t.thumbnailAlt||"Video thumbnail",c.loading="lazy",c.decoding="async",c.setAttribute("data-src",r),e.dataset.ytThumbSrc=r,e.appendChild(c)}let o=document.createElement("span");return o.className="yt-placeholder__icon",o.setAttribute("aria-hidden","true"),o.textContent="\u25B6",e.appendChild(o),e}var v=null;function F(n){let t=n.querySelector(".yt-placeholder__thumb");if(!t)return;let e=t.dataset.src;e&&(t.src=e,t.removeAttribute("data-src"),n.dataset.thumbLoaded="true")}function _(){v||typeof IntersectionObserver>"u"||(v=new IntersectionObserver(n=>{n.forEach(t=>{t.isIntersecting&&(F(t.target),v.unobserve(t.target))})},{rootMargin:"200px 0px"}))}function q(n){let t=n.querySelector(".yt-placeholder__thumb");if(t&&n.dataset.thumbLoaded!=="true"){if(!t.dataset.src){n.dataset.thumbLoaded="true";return}if(typeof IntersectionObserver>"u"){F(n);return}_(),v.observe(n)}}function z(n){if(!n)return;u("Sanitizing fragment",n);let t=n.querySelectorAll("iframe"),e=n.querySelectorAll("embed"),s=n.querySelectorAll("object");[...t,...e,...s].forEach(r=>{let o=r.src||r.data||r.getAttribute("src")||r.getAttribute("data");if(o&&T.test(o)){let c=k(o),a=A(o),d=r.getAttribute("data-yt-thumb")||r.dataset?.ytThumb;u("Replacing YouTube embed with placeholder",{videoUrl:a,element:r});let l=I(a,{videoId:c,thumbnailUrl:d});r.width&&(l.style.width=r.width),r.height&&(l.style.height=r.height),r.style.width&&(l.style.width=r.style.width),r.style.height&&(l.style.height=r.style.height),r.parentNode.replaceChild(l,r)}})}function U(n){if(!n||typeof n!="string")return n;u("Sanitizing HTML string");let e=new DOMParser().parseFromString(n,"text/html");return z(e.body),e.body.innerHTML}function N(n){let t=n.currentTarget,e=t.getAttribute("data-yt-src"),s=A(e);if(!s)return;u("Placeholder clicked, loading iframe",{videoUrl:s});let i=document.createElement("iframe"),r=`${s}${s.includes("?")?"&":"?"}autoplay=1&rel=0`;i.src=r,i.width=t.style.width||"100%",i.height=t.style.height||"100%",i.title="YouTube video",i.frameBorder="0",i.allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",i.allowFullscreen=!0,i.style.aspectRatio="16/9",i.dataset.ytOptIn="true",t.parentNode.replaceChild(i,t),i.focus()}function m(n=document){u("Initializing YouTube opt-in on root",n===document?"document":n),n.querySelectorAll("[data-yt-template]").forEach(i=>{if(i.hasAttribute("data-yt-processed"))return;i.setAttribute("data-yt-processed","true"),u("Processing template host",i);let r=i.getAttribute("data-yt-template"),o=document.getElementById(r);if(!o)return;u("Found template for host",r);let c=o.content.cloneNode(!0);z(c),i.appendChild(c)}),n.querySelectorAll(".yt-placeholder[data-yt-src]").forEach(i=>{if(!i.querySelector(".yt-placeholder__icon")&&i.tagName==="DIV"){u("Upgrading static placeholder div to button",i);let r=i.getAttribute("data-yt-src"),o=i.getAttribute("data-yt-thumb")||i.dataset?.ytThumb,c=I(r,{thumbnailUrl:o});c.className=i.className,Array.from(i.attributes).forEach(a=>{["class","data-yt-src","data-yt-thumb"].includes(a.name)||c.setAttribute(a.name,a.value)}),o&&c.setAttribute("data-yt-thumb",o),i.parentNode.replaceChild(c,i)}}),n.querySelectorAll("button.yt-placeholder[data-yt-src]").forEach(i=>{i.hasAttribute("data-click-bound")||(i.addEventListener("click",N),i.setAttribute("data-click-bound","true"),u("Bound click handler to placeholder",i)),q(i)})}function V(){u("Setting up dynamic handlers"),window.salla&&window.salla.event&&(window.salla.event.on("salla-products-slider::products.fetched",s=>{u("Event: salla-products-slider::products.fetched",s),m(s?.container||document)}),window.salla.event.on("product::quickview.opened",s=>{u("Event: product::quickview.opened",s),m(document)}),window.salla.event.on("product::quickview.response",s=>{u("Event: product::quickview.response",s),s&&s.response&&s.response.html&&(u("Sanitizing quickview HTML response before render"),s.response.html=U(s.response.html)),m(document)}));let n=document.getElementById("btn-show-more");n&&n.addEventListener("click",()=>{u("Read more button clicked");let s=document.getElementById("more-content");s&&m(s)});let t=new MutationObserver(s=>{s.forEach(i=>{u("Mutation observed",i),i.addedNodes.forEach(r=>{if(r.nodeType!==1)return;r.classList&&r.classList.contains("product-description-content")&&(u("New product-description-content detected, initializing",r),m(r));let o=[];r.tagName==="IFRAME"?o.push(r):r.querySelectorAll&&o.push(...r.querySelectorAll("iframe")),o.forEach(c=>{if(c.dataset&&c.dataset.ytOptIn==="true"){u("Observed opt-in iframe, skipping neutralization",c);return}let a=c.src||c.getAttribute("src");if(a&&T.test(a)){u("Stray iframe detected, neutralizing",c),c.removeAttribute("src"),c.removeAttribute("srcdoc"),c.src="about:blank";let d=A(a),l=I(d);l.addEventListener("click",N),l.setAttribute("data-click-bound","true"),u("Replacing stray iframe with placeholder",{videoUrl:d,iframe:c}),c.parentNode.replaceChild(l,c),q(l)}})})})});document.querySelectorAll(".product-description-content").forEach(s=>{t.observe(s,{childList:!0,subtree:!0})}),t.observe(document.body,{childList:!0,subtree:!0})}function X(){u("Scanning for existing YouTube iframes");let n=document.querySelectorAll("iframe"),t=0;n.forEach(e=>{let s=e.src||e.getAttribute("src");if(s&&T.test(s)){if(e.dataset.ytOptIn==="true"||e.hasAttribute("data-yt-processed"))return;u("Found existing YouTube iframe, replacing",{src:s,iframe:e}),e.src="about:blank";let i=A(s),r=I(i);e.width&&(r.style.width=e.width),e.height&&(r.style.height=e.height),e.style.width&&(r.style.width=e.style.width),e.style.height&&(r.style.height=e.style.height),r.addEventListener("click",N),r.setAttribute("data-click-bound","true"),e.parentNode.replaceChild(r,e),q(r),t++}}),u(`Replaced ${t} existing YouTube iframes`)}function B(){u("Initializing module"),m(),X(),V()}document.readyState==="loading"?document.addEventListener("DOMContentLoaded",B):B();window.darlenaYoutubeOptIn=m;var Y=()=>{if(document.getElementById("product-slider-styles"))return;let n=document.createElement("style");n.id="product-slider-styles",n.textContent=`
+                `;
+          document.head.appendChild(styleEl);
+        }
+        window.salla?.event?.dispatch("twilight::mutation");
+        this.setupStockFilter(newSlider);
+      } catch {
+      }
+    }
+    setupStockFilter(slider) {
+      window.salla?.event?.on("salla-products-slider::products.fetched", (event) => {
+        if (!slider.contains(event.target)) return;
+        setTimeout(() => {
+          const productCards = slider.querySelectorAll(".s-product-card-entry");
+          if (!productCards.length) return;
+          let inStockCount = 0;
+          const maxProducts = 15;
+          productCards.forEach((card) => {
+            const isOutOfStock = card.classList.contains("s-product-card-out-of-stock");
+            if (isOutOfStock || inStockCount >= maxProducts) {
+              card.style.display = "none";
+            } else {
+              inStockCount++;
+            }
+          });
+        }, 200);
+      });
+    }
+    waitForElement(selector, callback) {
+      const element = document.querySelector(selector);
+      if (element) {
+        callback(element);
+        return;
+      }
+      const observer = new MutationObserver(() => {
+        const element2 = document.querySelector(selector);
+        if (element2) {
+          observer.disconnect();
+          callback(element2);
+        }
+      });
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+    }
+  };
+  var productRecommendations = new ProductRecommendations();
+  var product_recommendations_default = productRecommendations;
+
+  // product-ranking-init.js
+  var initialized = false;
+  var initAttempts = 0;
+  var MAX_ATTEMPTS = 2;
+  function initRanking() {
+    console.log(`[PR Init] Attempt ${initAttempts + 1}/${MAX_ATTEMPTS}`);
+    if (initialized) return;
+    initAttempts++;
+    if (initAttempts > MAX_ATTEMPTS) {
+      console.warn("[PR Init] Max attempts reached");
+      return;
+    }
+    const categoryList = document.querySelector('salla-products-list[source="product.index"], salla-products-list[source="categories"]');
+    console.log("[PR Init] Category list found:", !!categoryList);
+    if (categoryList) {
+      const categoryId = categoryList.getAttribute("source-value");
+      if (categoryId) {
+        console.log("[PR Init] \u2705 Creating ranking for category:", categoryId);
+        createRanking("category", categoryId);
+        initialized = true;
+        return;
+      }
+    }
+    const tagList = document.querySelector('salla-products-list[source="product.index.tag"], salla-products-list[source^="tags."]');
+    if (tagList) {
+      const tagId = tagList.getAttribute("source-value");
+      if (tagId) {
+        console.log("[PR Init] \u2705 Creating ranking for tag:", tagId);
+        createRanking("tag", tagId);
+        initialized = true;
+        return;
+      }
+    }
+    if (initAttempts < MAX_ATTEMPTS) {
+      console.log("[PR Init] Retrying in 800ms...");
+      setTimeout(initRanking, 800);
+    }
+  }
+  function createRanking(type, id) {
+    if (document.querySelector(`product-ranking[${type}-id="${id}"]`)) {
+      return;
+    }
+    const ranking = document.createElement("product-ranking");
+    ranking.setAttribute(`${type}-id`, id);
+    document.body.appendChild(ranking);
+  }
+  document.addEventListener("salla::page::changed", () => {
+    initialized = false;
+    initAttempts = 0;
+    document.querySelectorAll("product-ranking").forEach((el) => el.remove());
+    setTimeout(initRanking, 100);
+  });
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initRanking);
+  } else {
+    initRanking();
+    document.addEventListener("salla::ready", () => {
+      if (!initialized) {
+        setTimeout(initRanking, 100);
+      }
+    });
+  }
+
+  // partials/youtube-lazy.js
+  var LOG_PREFIX = "[YouTube Opt-In]";
+  var debug = (...args) => console.log(LOG_PREFIX, ...args);
+  var YOUTUBE_REGEX = /\/\/(www\.)?(youtube\.com|youtube-nocookie\.com|youtu\.be)\//i;
+  function normalizeYoutubeUrl(url) {
+    if (!url) return "";
+    const videoId = extractVideoId(url);
+    if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    return url.split("?")[0];
+  }
+  function extractVideoId(url) {
+    if (!url) return null;
+    const patterns = [
+      /youtube\.com\/embed\/([^?&/]+)/,
+      /youtube-nocookie\.com\/embed\/([^?&/]+)/,
+      /youtube\.com\/v\/([^?&/]+)/,
+      /youtube\.com\/watch\?v=([^&]+)/,
+      /youtu\.be\/([^?&/]+)/,
+      /youtube\.com\/shorts\/([^?&/]+)/
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) return match[1];
+    }
+    return null;
+  }
+  function createPlaceholderButton(videoUrl, options = {}) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "yt-placeholder";
+    button.setAttribute("data-yt-src", videoUrl);
+    button.setAttribute("aria-label", "Play YouTube video");
+    const videoId = options.videoId || extractVideoId(videoUrl);
+    const customThumbnail = options.thumbnailUrl;
+    const thumbnailUrl = customThumbnail || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null);
+    if (thumbnailUrl) {
+      const img = document.createElement("img");
+      img.className = "yt-placeholder__thumb";
+      img.alt = options.thumbnailAlt || "Video thumbnail";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.setAttribute("data-src", thumbnailUrl);
+      button.dataset.ytThumbSrc = thumbnailUrl;
+      button.appendChild(img);
+    }
+    const icon = document.createElement("span");
+    icon.className = "yt-placeholder__icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "\u25B6";
+    button.appendChild(icon);
+    return button;
+  }
+  var thumbnailObserver = null;
+  function loadThumbnail(button) {
+    const img = button.querySelector(".yt-placeholder__thumb");
+    if (!img) return;
+    const src = img.dataset.src;
+    if (src) {
+      img.src = src;
+      img.removeAttribute("data-src");
+      button.dataset.thumbLoaded = "true";
+    }
+  }
+  function ensureThumbnailObserver() {
+    if (thumbnailObserver || typeof IntersectionObserver === "undefined") return;
+    thumbnailObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          loadThumbnail(entry.target);
+          thumbnailObserver.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: "200px 0px" });
+  }
+  function initPlaceholderThumbnail(button) {
+    const img = button.querySelector(".yt-placeholder__thumb");
+    if (!img) return;
+    if (button.dataset.thumbLoaded === "true") return;
+    if (!img.dataset.src) {
+      button.dataset.thumbLoaded = "true";
+      return;
+    }
+    if (typeof IntersectionObserver === "undefined") {
+      loadThumbnail(button);
+      return;
+    }
+    ensureThumbnailObserver();
+    thumbnailObserver.observe(button);
+  }
+  function sanitizeFragment(fragment) {
+    if (!fragment) return;
+    debug("Sanitizing fragment", fragment);
+    const iframes = fragment.querySelectorAll("iframe");
+    const embeds = fragment.querySelectorAll("embed");
+    const objects = fragment.querySelectorAll("object");
+    const elements = [...iframes, ...embeds, ...objects];
+    elements.forEach((element) => {
+      const src = element.src || element.data || element.getAttribute("src") || element.getAttribute("data");
+      if (src && YOUTUBE_REGEX.test(src)) {
+        const videoId = extractVideoId(src);
+        const videoUrl = normalizeYoutubeUrl(src);
+        const customThumbnail = element.getAttribute("data-yt-thumb") || element.dataset?.ytThumb;
+        debug("Replacing YouTube embed with placeholder", { videoUrl, element });
+        const placeholder = createPlaceholderButton(videoUrl, { videoId, thumbnailUrl: customThumbnail });
+        if (element.width) placeholder.style.width = element.width;
+        if (element.height) placeholder.style.height = element.height;
+        if (element.style.width) placeholder.style.width = element.style.width;
+        if (element.style.height) placeholder.style.height = element.style.height;
+        element.parentNode.replaceChild(placeholder, element);
+      }
+    });
+  }
+  function sanitizeHtmlString(html) {
+    if (!html || typeof html !== "string") return html;
+    debug("Sanitizing HTML string");
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    sanitizeFragment(doc.body);
+    return doc.body.innerHTML;
+  }
+  function handlePlaceholderClick(event) {
+    const button = event.currentTarget;
+    const storedUrl = button.getAttribute("data-yt-src");
+    const baseUrl = normalizeYoutubeUrl(storedUrl);
+    if (!baseUrl) return;
+    debug("Placeholder clicked, loading iframe", { videoUrl: baseUrl });
+    const iframe = document.createElement("iframe");
+    const autoplayUrl = `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}autoplay=1&rel=0`;
+    iframe.src = autoplayUrl;
+    iframe.width = button.style.width || "100%";
+    iframe.height = button.style.height || "100%";
+    iframe.title = "YouTube video";
+    iframe.frameBorder = "0";
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+    iframe.allowFullscreen = true;
+    iframe.style.aspectRatio = "16/9";
+    iframe.dataset.ytOptIn = "true";
+    button.parentNode.replaceChild(iframe, button);
+    iframe.focus();
+  }
+  function initYouTubeOptIn(root = document) {
+    debug("Initializing YouTube opt-in on root", root === document ? "document" : root);
+    const templateHosts = root.querySelectorAll("[data-yt-template]");
+    templateHosts.forEach((host) => {
+      if (host.hasAttribute("data-yt-processed")) return;
+      host.setAttribute("data-yt-processed", "true");
+      debug("Processing template host", host);
+      const templateId = host.getAttribute("data-yt-template");
+      const template = document.getElementById(templateId);
+      if (!template) return;
+      debug("Found template for host", templateId);
+      const fragment = template.content.cloneNode(true);
+      sanitizeFragment(fragment);
+      host.appendChild(fragment);
+    });
+    const standalonePlaceholders = root.querySelectorAll(".yt-placeholder[data-yt-src]");
+    standalonePlaceholders.forEach((placeholder) => {
+      if (placeholder.querySelector(".yt-placeholder__icon")) return;
+      if (placeholder.tagName === "DIV") {
+        debug("Upgrading static placeholder div to button", placeholder);
+        const videoUrl = placeholder.getAttribute("data-yt-src");
+        const customThumbnail = placeholder.getAttribute("data-yt-thumb") || placeholder.dataset?.ytThumb;
+        const button = createPlaceholderButton(videoUrl, { thumbnailUrl: customThumbnail });
+        button.className = placeholder.className;
+        Array.from(placeholder.attributes).forEach((attr) => {
+          if (["class", "data-yt-src", "data-yt-thumb"].includes(attr.name)) return;
+          button.setAttribute(attr.name, attr.value);
+        });
+        if (customThumbnail) {
+          button.setAttribute("data-yt-thumb", customThumbnail);
+        }
+        placeholder.parentNode.replaceChild(button, placeholder);
+      }
+    });
+    const allPlaceholders = root.querySelectorAll("button.yt-placeholder[data-yt-src]");
+    allPlaceholders.forEach((placeholder) => {
+      if (!placeholder.hasAttribute("data-click-bound")) {
+        placeholder.addEventListener("click", handlePlaceholderClick);
+        placeholder.setAttribute("data-click-bound", "true");
+        debug("Bound click handler to placeholder", placeholder);
+      }
+      initPlaceholderThumbnail(placeholder);
+    });
+  }
+  function setupDynamicHandlers() {
+    debug("Setting up dynamic handlers");
+    if (window.salla && window.salla.event) {
+      window.salla.event.on("salla-products-slider::products.fetched", (payload) => {
+        debug("Event: salla-products-slider::products.fetched", payload);
+        initYouTubeOptIn(payload?.container || document);
+      });
+      window.salla.event.on("product::quickview.opened", (payload) => {
+        debug("Event: product::quickview.opened", payload);
+        initYouTubeOptIn(document);
+      });
+      window.salla.event.on("product::quickview.response", (payload) => {
+        debug("Event: product::quickview.response", payload);
+        if (payload && payload.response && payload.response.html) {
+          debug("Sanitizing quickview HTML response before render");
+          payload.response.html = sanitizeHtmlString(payload.response.html);
+        }
+        initYouTubeOptIn(document);
+      });
+    }
+    const readMoreBtn = document.getElementById("btn-show-more");
+    if (readMoreBtn) {
+      readMoreBtn.addEventListener("click", () => {
+        debug("Read more button clicked");
+        const moreContent = document.getElementById("more-content");
+        if (moreContent) {
+          initYouTubeOptIn(moreContent);
+        }
+      });
+    }
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        debug("Mutation observed", mutation);
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType !== 1) return;
+          if (node.classList && node.classList.contains("product-description-content")) {
+            debug("New product-description-content detected, initializing", node);
+            initYouTubeOptIn(node);
+          }
+          const strayIframes = [];
+          if (node.tagName === "IFRAME") {
+            strayIframes.push(node);
+          } else if (node.querySelectorAll) {
+            strayIframes.push(...node.querySelectorAll("iframe"));
+          }
+          strayIframes.forEach((iframe) => {
+            if (iframe.dataset && iframe.dataset.ytOptIn === "true") {
+              debug("Observed opt-in iframe, skipping neutralization", iframe);
+              return;
+            }
+            const src = iframe.src || iframe.getAttribute("src");
+            if (src && YOUTUBE_REGEX.test(src)) {
+              debug("Stray iframe detected, neutralizing", iframe);
+              iframe.removeAttribute("src");
+              iframe.removeAttribute("srcdoc");
+              iframe.src = "about:blank";
+              const videoUrl = normalizeYoutubeUrl(src);
+              const placeholder = createPlaceholderButton(videoUrl);
+              placeholder.addEventListener("click", handlePlaceholderClick);
+              placeholder.setAttribute("data-click-bound", "true");
+              debug("Replacing stray iframe with placeholder", { videoUrl, iframe });
+              iframe.parentNode.replaceChild(placeholder, iframe);
+              initPlaceholderThumbnail(placeholder);
+            }
+          });
+        });
+      });
+    });
+    const containers = document.querySelectorAll(".product-description-content");
+    containers.forEach((container) => {
+      observer.observe(container, { childList: true, subtree: true });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+  function scanAndReplaceExistingIframes() {
+    debug("Scanning for existing YouTube iframes");
+    const allIframes = document.querySelectorAll("iframe");
+    let replacedCount = 0;
+    allIframes.forEach((iframe) => {
+      const src = iframe.src || iframe.getAttribute("src");
+      if (src && YOUTUBE_REGEX.test(src)) {
+        if (iframe.dataset.ytOptIn === "true" || iframe.hasAttribute("data-yt-processed")) {
+          return;
+        }
+        debug("Found existing YouTube iframe, replacing", { src, iframe });
+        iframe.src = "about:blank";
+        const videoUrl = normalizeYoutubeUrl(src);
+        const placeholder = createPlaceholderButton(videoUrl);
+        if (iframe.width) placeholder.style.width = iframe.width;
+        if (iframe.height) placeholder.style.height = iframe.height;
+        if (iframe.style.width) placeholder.style.width = iframe.style.width;
+        if (iframe.style.height) placeholder.style.height = iframe.style.height;
+        placeholder.addEventListener("click", handlePlaceholderClick);
+        placeholder.setAttribute("data-click-bound", "true");
+        iframe.parentNode.replaceChild(placeholder, iframe);
+        initPlaceholderThumbnail(placeholder);
+        replacedCount++;
+      }
+    });
+    debug(`Replaced ${replacedCount} existing YouTube iframes`);
+  }
+  function init() {
+    debug("Initializing module");
+    initYouTubeOptIn();
+    scanAndReplaceExistingIframes();
+    setupDynamicHandlers();
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+  window.darlenaYoutubeOptIn = initYouTubeOptIn;
+
+  // partials/product-card-enhancer.js
+  var injectProductSliderStyles = () => {
+    if (document.getElementById("product-slider-styles")) return;
+    const style = document.createElement("style");
+    style.id = "product-slider-styles";
+    style.textContent = `
     .product-slider-dots {
       position: absolute;
       bottom: 10px;
@@ -204,4 +1485,481 @@
     .swipe-indicator.right {
       background: linear-gradient(270deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 50%);
     }
-  `,document.head.appendChild(n)},$=class{constructor(){this.enhancedCards=new Set,this.cardInstances=new Map,this.init()}init(){Y(),window.app?.status==="ready"?(this.setupEventListeners(),this.enhanceExistingCards()):document.addEventListener("theme::ready",()=>{this.setupEventListeners(),this.enhanceExistingCards()})}setupEventListeners(){document.addEventListener("salla-products-slider::products.fetched",t=>{console.log("[Product Card Enhancer] Products slider fetched"),setTimeout(()=>this.enhanceExistingCards(),100)}),document.addEventListener("salla-products-list::products.fetched",t=>{console.log("[Product Card Enhancer] Products list fetched"),setTimeout(()=>this.enhanceExistingCards(),100)}),document.addEventListener("salla::page::changed",()=>{console.log("[Product Card Enhancer] Page changed"),setTimeout(()=>this.enhanceExistingCards(),500)}),this.setupMutationObserver()}setupMutationObserver(){new MutationObserver(e=>{let s=!1;for(let i of e){if(i.addedNodes.length>0){for(let r of i.addedNodes)if(r.nodeType===1&&(r.classList?.contains("s-product-card-entry")||r.querySelector?.(".s-product-card-entry"))){s=!0;break}}if(s)break}s&&setTimeout(()=>this.enhanceExistingCards(),50)}).observe(document.body,{childList:!0,subtree:!0})}enhanceExistingCards(){let t=document.querySelectorAll(".s-product-card-entry");console.log(`[Product Card Enhancer] Found ${t.length} product cards`),t.forEach(e=>{let s=this.extractProductId(e);s&&!this.enhancedCards.has(s)&&this.enhanceCard(e,s)})}extractProductId(t){if(t.dataset.id)return t.dataset.id;if(t.id&&!isNaN(t.id))return t.id;let e=t.querySelector(".s-product-card-image a, .s-product-card-content-title a");if(e?.href){let i=e.href.match(/\/product\/[^\/]+\/(\d+)/);if(i)return i[1]}let s=t.getAttribute("product");if(s)try{let i=JSON.parse(s);if(i.id)return String(i.id)}catch{}return null}enhanceCard(t,e){console.log(`[Product Card Enhancer] Enhancing card for product ${e}`);let s=t.querySelector(".s-product-card-image");if(!s){console.warn(`[Product Card Enhancer] No image wrapper found for product ${e}`);return}let i=new M(t,e,s);this.cardInstances.set(e,i),this.enhancedCards.add(e),i.setupLazyInit()}},M=class{constructor(t,e,s){this.card=t,this.productId=e,this.imageWrapper=s,this.imageContainer=s.querySelector("a"),this.currentSlide=0,this.additionalImages=[],this.touchStartX=0,this.touchEndX=0,this.isSwiping=!1,this.isMouseDown=!1,this.sliderInitialized=!1,this.sliderId=`slider-${e}-${Date.now()}`,this.boundEventHandlers={}}setupLazyInit(){this.imageWrapper&&(this._observer=new IntersectionObserver(t=>{t.forEach(e=>{e.isIntersecting&&!this.sliderInitialized&&(this.sliderInitialized=!0,this.setupImageSlider(),setTimeout(()=>{this.fetchProductImages()},50),this._observer.unobserve(e.target))})},{rootMargin:"300px",threshold:.01}),this._observer.observe(this.imageWrapper))}setupImageSlider(){if(!this.imageContainer)return;let t=document.createElement("div");t.className="swipe-indicator",this.imageContainer.appendChild(t);let e=null,s=null,i=null,r=!1;this.boundEventHandlers.touchstart=a=>{e=a.touches[0].clientX,s=a.touches[0].clientY,i=Date.now(),r=!1},this.boundEventHandlers.touchmove=a=>{if(!e)return;let d=a.touches[0].clientX-e,l=a.touches[0].clientY-s;Math.abs(d)>Math.abs(l)&&Math.abs(d)>10&&(r=!0,this.isSwiping=!0,t.classList.toggle("right",d>0),t.style.opacity=Math.min(Math.abs(d)/100,.5),a.preventDefault())},this.boundEventHandlers.touchend=a=>{if(!e||!r){e=s=null,this.isSwiping=!1,t.style.opacity=0;return}if(this.isSwiping){let l=a.changedTouches[0].clientX-e,p=Date.now()-i<300?30:50;Math.abs(l)>=p&&(l>0?(this.prevSlide(),this.triggerHapticFeedback("medium")):(this.nextSlide(),this.triggerHapticFeedback("medium"))),a.preventDefault(),a.stopPropagation()}t.style.opacity=0,e=s=null,this.isSwiping=!1},this.imageContainer.addEventListener("touchstart",this.boundEventHandlers.touchstart,{passive:!0}),this.imageContainer.addEventListener("touchmove",this.boundEventHandlers.touchmove,{passive:!1}),this.imageContainer.addEventListener("touchend",this.boundEventHandlers.touchend,{passive:!1}),this.boundEventHandlers.mousedown=a=>{this.isMouseDown=!0,e=a.clientX,s=a.clientY,i=Date.now(),r=!1,a.preventDefault(),a.stopPropagation()},this.boundEventHandlers.mousemove=a=>{if(!this.isMouseDown||!e)return;let d=a.clientX-e;Math.abs(d)>10&&(r=!0,this.isSwiping=!0,t.classList.toggle("right",d>0),t.style.opacity=Math.min(Math.abs(d)/100,.5)),this.isSwiping&&(a.preventDefault(),a.stopPropagation())},this.boundEventHandlers.mouseup=a=>{if(this.isMouseDown){if(r&&this.isSwiping){let l=a.clientX-e,p=Date.now()-i<300?30:50;Math.abs(l)>=p&&(l>0?this.prevSlide():this.nextSlide()),a.preventDefault(),a.stopPropagation()}t.style.opacity=0,this.isMouseDown=!1,this.isSwiping=!1,e=s=null}},this.imageContainer.addEventListener("mousedown",this.boundEventHandlers.mousedown),this.imageContainer.addEventListener("mousemove",this.boundEventHandlers.mousemove),window.addEventListener("mouseup",this.boundEventHandlers.mouseup);let o=document.createElement("div");o.className="product-slider-dots",o.dataset.sliderId=this.sliderId,o.dataset.productId=this.productId;let c=document.createElement("span");c.className="product-slider-dot active",c.dataset.sliderId=this.sliderId,c.dataset.productId=this.productId,c.dataset.index="0",c.addEventListener("click",a=>{a.preventDefault(),a.stopPropagation(),this.changeSlide(0),this.triggerHapticFeedback("light")}),o.appendChild(c);for(let a=0;a<2;a++){let d=document.createElement("span");d.className="product-slider-dot",d.dataset.sliderId=this.sliderId,d.dataset.productId=this.productId,d.dataset.index=String(a+1),d.addEventListener("click",l=>{l.preventDefault(),l.stopPropagation(),this.changeSlide(a+1),this.triggerHapticFeedback("light")}),o.appendChild(d)}this.imageWrapper.appendChild(o)}fetchProductImages(){if(!this.productId)return;let t=`https://productstoredis-163858290861.me-central2.run.app/product-images/${this.productId}`;fetch(t,{timeout:5e3}).then(e=>e.json()).then(e=>this.processImageResponse(e)).catch(e=>{console.warn(`[Product Card Enhancer] Failed to fetch images for product ${this.productId}:`,e);let s=this.imageWrapper.querySelector(`.product-slider-dots[data-slider-id="${this.sliderId}"]`);s&&(s.style.display="none")})}processImageResponse(t){if(!t?.images||!Array.isArray(t.images)){let i=this.imageWrapper.querySelector(`.product-slider-dots[data-slider-id="${this.sliderId}"]`);i&&(i.style.display="none");return}let e=t.images.filter(i=>i&&i.url).sort((i,r)=>(i.sort||0)-(r.sort||0)).slice(0,2).map(i=>({url:i.url,alt:i.alt}));if(e.length===0){let i=this.imageWrapper.querySelector(`.product-slider-dots[data-slider-id="${this.sliderId}"]`);i&&(i.style.display="none");return}this.additionalImages=e;let s=this.imageWrapper.querySelector(`.product-slider-dots[data-slider-id="${this.sliderId}"]`);s&&(s.style.display="flex"),this.preloadAllImages()}preloadAllImages(){this.additionalImages&&this.additionalImages.length>0&&(this.addImageToSlider(this.additionalImages[0],1),this.additionalImages.length>1&&this.addImageToSlider(this.additionalImages[1],2))}addImageToSlider(t,e){if(!t?.url||!this.imageContainer||this.imageContainer.querySelector(`.product-slider-image[data-slider-id="${this.sliderId}"][data-index="${e}"]`))return;let i=document.createElement("img");i.className="product-slider-image",i.src=t.url,i.alt=t.alt||"Product image",i.dataset.sliderId=this.sliderId,i.dataset.productId=this.productId,i.dataset.index=String(e),i.onload=()=>{let r=this.imageWrapper.querySelector(`.product-slider-dot[data-slider-id="${this.sliderId}"][data-index="${e}"]`);r&&r.classList.add("loaded")},i.onerror=()=>{i.remove();let r=this.imageWrapper.querySelector(`.product-slider-dot[data-slider-id="${this.sliderId}"][data-index="${e}"]`);r&&(r.remove(),this.checkDotsVisibility())},this.imageContainer.appendChild(i)}checkDotsVisibility(){let t=this.imageWrapper.querySelector(`.product-slider-dots[data-slider-id="${this.sliderId}"]`);if(t){let e=t.querySelectorAll(".product-slider-dot");t.style.display=e.length<=1?"none":"flex"}}changeSlide(t){this.additionalImages&&t>0&&this.additionalImages[t-1]&&this.addImageToSlider(this.additionalImages[t-1],t),this.currentSlide=t;let e=this.imageContainer.querySelector('img.lazy, img[loading="lazy"], img:first-child:not(.product-slider-image)'),s=this.imageContainer.querySelectorAll(`.product-slider-image[data-slider-id="${this.sliderId}"]`);this.imageWrapper.querySelectorAll(`.product-slider-dot[data-slider-id="${this.sliderId}"]`).forEach(o=>o.classList.remove("active"));let r=this.imageWrapper.querySelector(`.product-slider-dot[data-slider-id="${this.sliderId}"][data-index="${t}"]`);if(r&&r.classList.add("active"),t===0)e&&(e.style.visibility="visible",e.style.opacity="1",e.style.zIndex="10"),s.forEach(o=>o.classList.remove("active"));else{e&&(e.style.visibility="hidden",e.style.opacity="0",e.style.zIndex="5"),s.forEach(c=>c.classList.remove("active"));let o=this.imageContainer.querySelector(`.product-slider-image[data-slider-id="${this.sliderId}"][data-index="${t}"]`);o?o.classList.add("active"):e&&(e.style.visibility="visible",e.style.opacity="1",e.style.zIndex="10")}}prevSlide(){let t=this.imageWrapper.querySelectorAll(`.product-slider-dot[data-slider-id="${this.sliderId}"]`).length,e=(this.currentSlide-1+t)%t;this.changeSlide(e)}nextSlide(){let t=this.imageWrapper.querySelectorAll(`.product-slider-dot[data-slider-id="${this.sliderId}"]`).length,e=(this.currentSlide+1)%t;this.changeSlide(e)}triggerHapticFeedback(t){try{if(window.navigator&&window.navigator.vibrate)switch(t){case"light":window.navigator.vibrate(10);break;case"medium":window.navigator.vibrate(25);break;case"strong":window.navigator.vibrate([10,20,30]);break}}catch{}}},ct=new $;window.productRecommendations=x;window.redisService=h;var W=n=>document.readyState==="loading"?document.addEventListener("DOMContentLoaded",n):n();function G(){if(!document.body.classList.contains("index")){console.log("[Algolia Bundle] Not on homepage, skipping category products injection");return}let n=".app-inner",t="mahaba-category-products";function e(){let i=document.querySelector(n);if(i&&!i.querySelector(t))try{console.log(`[Algolia Bundle] Found ${n}, injecting ${t}...`);let r=document.createElement(t),o=document.querySelector(".store-footer");return o?i.insertBefore(r,o):i.appendChild(r),console.log("\u2705 [Algolia Bundle] Homepage category component injected successfully"),!0}catch(r){return console.error("[Algolia Bundle] Error during injection:",r),!0}return!1}if(e())return;console.log(`[Algolia Bundle] ${n} not found, waiting for async load...`),new MutationObserver((i,r)=>{i.some(c=>c.addedNodes.length>0)&&e()&&r.disconnect()}).observe(document.body,{childList:!0,subtree:!0})}W(()=>{G(),document.querySelector('[id^="product-"]')&&setTimeout(()=>{x.initialize(),console.log("\u2705 [Algolia Bundle] Product recommendations initialized")},3e3),console.log("\u2705 [Algolia Bundle] Loaded successfully")});})();
+  `;
+    document.head.appendChild(style);
+  };
+  var ProductCardEnhancer = class {
+    constructor() {
+      this.enhancedCards = /* @__PURE__ */ new Set();
+      this.cardInstances = /* @__PURE__ */ new Map();
+      this.init();
+    }
+    init() {
+      injectProductSliderStyles();
+      if (window.app?.status === "ready") {
+        this.setupEventListeners();
+        this.enhanceExistingCards();
+      } else {
+        document.addEventListener("theme::ready", () => {
+          this.setupEventListeners();
+          this.enhanceExistingCards();
+        });
+      }
+    }
+    setupEventListeners() {
+      document.addEventListener("salla-products-slider::products.fetched", (e) => {
+        console.log("[Product Card Enhancer] Products slider fetched");
+        setTimeout(() => this.enhanceExistingCards(), 100);
+      });
+      document.addEventListener("salla-products-list::products.fetched", (e) => {
+        console.log("[Product Card Enhancer] Products list fetched");
+        setTimeout(() => this.enhanceExistingCards(), 100);
+      });
+      document.addEventListener("salla::page::changed", () => {
+        console.log("[Product Card Enhancer] Page changed");
+        setTimeout(() => this.enhanceExistingCards(), 500);
+      });
+      this.setupMutationObserver();
+    }
+    setupMutationObserver() {
+      const observer = new MutationObserver((mutations) => {
+        let hasNewCards = false;
+        for (const mutation of mutations) {
+          if (mutation.addedNodes.length > 0) {
+            for (const node of mutation.addedNodes) {
+              if (node.nodeType === 1) {
+                if (node.classList?.contains("s-product-card-entry") || node.querySelector?.(".s-product-card-entry")) {
+                  hasNewCards = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (hasNewCards) break;
+        }
+        if (hasNewCards) {
+          setTimeout(() => this.enhanceExistingCards(), 50);
+        }
+      });
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+    }
+    enhanceExistingCards() {
+      const cards = document.querySelectorAll(".s-product-card-entry");
+      console.log(`[Product Card Enhancer] Found ${cards.length} product cards`);
+      cards.forEach((card) => {
+        const productId = this.extractProductId(card);
+        if (productId && !this.enhancedCards.has(productId)) {
+          this.enhanceCard(card, productId);
+        }
+      });
+    }
+    extractProductId(card) {
+      if (card.dataset.id) {
+        return card.dataset.id;
+      }
+      if (card.id && !isNaN(card.id)) {
+        return card.id;
+      }
+      const link = card.querySelector(".s-product-card-image a, .s-product-card-content-title a");
+      if (link?.href) {
+        const match = link.href.match(/\/product\/[^\/]+\/(\d+)/);
+        if (match) return match[1];
+      }
+      const productAttr = card.getAttribute("product");
+      if (productAttr) {
+        try {
+          const product = JSON.parse(productAttr);
+          if (product.id) return String(product.id);
+        } catch (e) {
+        }
+      }
+      return null;
+    }
+    enhanceCard(card, productId) {
+      console.log(`[Product Card Enhancer] Enhancing card for product ${productId}`);
+      const imageWrapper = card.querySelector(".s-product-card-image");
+      if (!imageWrapper) {
+        console.warn(`[Product Card Enhancer] No image wrapper found for product ${productId}`);
+        return;
+      }
+      const instance = new CardSliderInstance(card, productId, imageWrapper);
+      this.cardInstances.set(productId, instance);
+      this.enhancedCards.add(productId);
+      instance.setupLazyInit();
+    }
+  };
+  var CardSliderInstance = class {
+    constructor(card, productId, imageWrapper) {
+      this.card = card;
+      this.productId = productId;
+      this.imageWrapper = imageWrapper;
+      this.imageContainer = imageWrapper.querySelector("a");
+      this.currentSlide = 0;
+      this.additionalImages = [];
+      this.touchStartX = 0;
+      this.touchEndX = 0;
+      this.isSwiping = false;
+      this.isMouseDown = false;
+      this.sliderInitialized = false;
+      this.sliderId = `slider-${productId}-${Date.now()}`;
+      this.boundEventHandlers = {};
+    }
+    setupLazyInit() {
+      if (!this.imageWrapper) return;
+      this._observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !this.sliderInitialized) {
+            this.sliderInitialized = true;
+            this.setupImageSlider();
+            setTimeout(() => {
+              this.fetchProductImages();
+            }, 50);
+            this._observer.unobserve(entry.target);
+          }
+        });
+      }, {
+        rootMargin: "300px",
+        threshold: 0.01
+      });
+      this._observer.observe(this.imageWrapper);
+    }
+    setupImageSlider() {
+      if (!this.imageContainer) return;
+      const swipeIndicator = document.createElement("div");
+      swipeIndicator.className = "swipe-indicator";
+      this.imageContainer.appendChild(swipeIndicator);
+      let startX = null;
+      let startY = null;
+      let startTime = null;
+      let hasMoved = false;
+      this.boundEventHandlers.touchstart = (e) => {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        startTime = Date.now();
+        hasMoved = false;
+      };
+      this.boundEventHandlers.touchmove = (e) => {
+        if (!startX) return;
+        const moveX = e.touches[0].clientX - startX;
+        const moveY = e.touches[0].clientY - startY;
+        if (Math.abs(moveX) > Math.abs(moveY) && Math.abs(moveX) > 10) {
+          hasMoved = true;
+          this.isSwiping = true;
+          swipeIndicator.classList.toggle("right", moveX > 0);
+          swipeIndicator.style.opacity = Math.min(Math.abs(moveX) / 100, 0.5);
+          e.preventDefault();
+        }
+      };
+      this.boundEventHandlers.touchend = (e) => {
+        if (!startX || !hasMoved) {
+          startX = startY = null;
+          this.isSwiping = false;
+          swipeIndicator.style.opacity = 0;
+          return;
+        }
+        if (this.isSwiping) {
+          const endX = e.changedTouches[0].clientX;
+          const moveX = endX - startX;
+          const elapsedTime = Date.now() - startTime;
+          const minSwipeDistance = elapsedTime < 300 ? 30 : 50;
+          if (Math.abs(moveX) >= minSwipeDistance) {
+            if (moveX > 0) {
+              this.prevSlide();
+              this.triggerHapticFeedback("medium");
+            } else {
+              this.nextSlide();
+              this.triggerHapticFeedback("medium");
+            }
+          }
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        swipeIndicator.style.opacity = 0;
+        startX = startY = null;
+        this.isSwiping = false;
+      };
+      this.imageContainer.addEventListener("touchstart", this.boundEventHandlers.touchstart, { passive: true });
+      this.imageContainer.addEventListener("touchmove", this.boundEventHandlers.touchmove, { passive: false });
+      this.imageContainer.addEventListener("touchend", this.boundEventHandlers.touchend, { passive: false });
+      this.boundEventHandlers.mousedown = (e) => {
+        this.isMouseDown = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startTime = Date.now();
+        hasMoved = false;
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      this.boundEventHandlers.mousemove = (e) => {
+        if (!this.isMouseDown || !startX) return;
+        const moveX = e.clientX - startX;
+        if (Math.abs(moveX) > 10) {
+          hasMoved = true;
+          this.isSwiping = true;
+          swipeIndicator.classList.toggle("right", moveX > 0);
+          swipeIndicator.style.opacity = Math.min(Math.abs(moveX) / 100, 0.5);
+        }
+        if (this.isSwiping) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      };
+      this.boundEventHandlers.mouseup = (e) => {
+        if (!this.isMouseDown) return;
+        if (hasMoved && this.isSwiping) {
+          const endX = e.clientX;
+          const moveX = endX - startX;
+          const elapsedTime = Date.now() - startTime;
+          const minSwipeDistance = elapsedTime < 300 ? 30 : 50;
+          if (Math.abs(moveX) >= minSwipeDistance) {
+            if (moveX > 0) {
+              this.prevSlide();
+            } else {
+              this.nextSlide();
+            }
+          }
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        swipeIndicator.style.opacity = 0;
+        this.isMouseDown = false;
+        this.isSwiping = false;
+        startX = startY = null;
+      };
+      this.imageContainer.addEventListener("mousedown", this.boundEventHandlers.mousedown);
+      this.imageContainer.addEventListener("mousemove", this.boundEventHandlers.mousemove);
+      window.addEventListener("mouseup", this.boundEventHandlers.mouseup);
+      const dotsContainer = document.createElement("div");
+      dotsContainer.className = "product-slider-dots";
+      dotsContainer.dataset.sliderId = this.sliderId;
+      dotsContainer.dataset.productId = this.productId;
+      const firstDot = document.createElement("span");
+      firstDot.className = "product-slider-dot active";
+      firstDot.dataset.sliderId = this.sliderId;
+      firstDot.dataset.productId = this.productId;
+      firstDot.dataset.index = "0";
+      firstDot.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.changeSlide(0);
+        this.triggerHapticFeedback("light");
+      });
+      dotsContainer.appendChild(firstDot);
+      for (let i = 0; i < 2; i++) {
+        const dot = document.createElement("span");
+        dot.className = "product-slider-dot";
+        dot.dataset.sliderId = this.sliderId;
+        dot.dataset.productId = this.productId;
+        dot.dataset.index = String(i + 1);
+        dot.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.changeSlide(i + 1);
+          this.triggerHapticFeedback("light");
+        });
+        dotsContainer.appendChild(dot);
+      }
+      this.imageWrapper.appendChild(dotsContainer);
+    }
+    fetchProductImages() {
+      if (!this.productId) return;
+      const requestUrl = `https://productstoredis-163858290861.me-central2.run.app/product-images/${this.productId}`;
+      fetch(requestUrl, { timeout: 5e3 }).then((response) => response.json()).then((data) => this.processImageResponse(data)).catch((error) => {
+        console.warn(`[Product Card Enhancer] Failed to fetch images for product ${this.productId}:`, error);
+        const dotsContainer = this.imageWrapper.querySelector(`.product-slider-dots[data-slider-id="${this.sliderId}"]`);
+        if (dotsContainer) {
+          dotsContainer.style.display = "none";
+        }
+      });
+    }
+    processImageResponse(data) {
+      if (!data?.images || !Array.isArray(data.images)) {
+        const dotsContainer2 = this.imageWrapper.querySelector(`.product-slider-dots[data-slider-id="${this.sliderId}"]`);
+        if (dotsContainer2) {
+          dotsContainer2.style.display = "none";
+        }
+        return;
+      }
+      const additionalImages = data.images.filter((img) => img && img.url).sort((a, b) => (a.sort || 0) - (b.sort || 0)).slice(0, 2).map((img) => ({ url: img.url, alt: img.alt }));
+      if (additionalImages.length === 0) {
+        const dotsContainer2 = this.imageWrapper.querySelector(`.product-slider-dots[data-slider-id="${this.sliderId}"]`);
+        if (dotsContainer2) {
+          dotsContainer2.style.display = "none";
+        }
+        return;
+      }
+      this.additionalImages = additionalImages;
+      const dotsContainer = this.imageWrapper.querySelector(`.product-slider-dots[data-slider-id="${this.sliderId}"]`);
+      if (dotsContainer) {
+        dotsContainer.style.display = "flex";
+      }
+      this.preloadAllImages();
+    }
+    preloadAllImages() {
+      if (this.additionalImages && this.additionalImages.length > 0) {
+        this.addImageToSlider(this.additionalImages[0], 1);
+        if (this.additionalImages.length > 1) {
+          this.addImageToSlider(this.additionalImages[1], 2);
+        }
+      }
+    }
+    addImageToSlider(image, index) {
+      if (!image?.url || !this.imageContainer) return;
+      const existingImg = this.imageContainer.querySelector(`.product-slider-image[data-slider-id="${this.sliderId}"][data-index="${index}"]`);
+      if (existingImg) return;
+      const img = document.createElement("img");
+      img.className = "product-slider-image";
+      img.src = image.url;
+      img.alt = image.alt || "Product image";
+      img.dataset.sliderId = this.sliderId;
+      img.dataset.productId = this.productId;
+      img.dataset.index = String(index);
+      img.onload = () => {
+        const dot = this.imageWrapper.querySelector(`.product-slider-dot[data-slider-id="${this.sliderId}"][data-index="${index}"]`);
+        if (dot) dot.classList.add("loaded");
+      };
+      img.onerror = () => {
+        img.remove();
+        const dot = this.imageWrapper.querySelector(`.product-slider-dot[data-slider-id="${this.sliderId}"][data-index="${index}"]`);
+        if (dot) {
+          dot.remove();
+          this.checkDotsVisibility();
+        }
+      };
+      this.imageContainer.appendChild(img);
+    }
+    checkDotsVisibility() {
+      const dotsContainer = this.imageWrapper.querySelector(`.product-slider-dots[data-slider-id="${this.sliderId}"]`);
+      if (dotsContainer) {
+        const availableDots = dotsContainer.querySelectorAll(".product-slider-dot");
+        dotsContainer.style.display = availableDots.length <= 1 ? "none" : "flex";
+      }
+    }
+    changeSlide(index) {
+      if (this.additionalImages && index > 0 && this.additionalImages[index - 1]) {
+        this.addImageToSlider(this.additionalImages[index - 1], index);
+      }
+      this.currentSlide = index;
+      const mainImage = this.imageContainer.querySelector('img.lazy, img[loading="lazy"], img:first-child:not(.product-slider-image)');
+      const additionalImages = this.imageContainer.querySelectorAll(`.product-slider-image[data-slider-id="${this.sliderId}"]`);
+      const dots = this.imageWrapper.querySelectorAll(`.product-slider-dot[data-slider-id="${this.sliderId}"]`);
+      dots.forEach((dot) => dot.classList.remove("active"));
+      const activeDot = this.imageWrapper.querySelector(`.product-slider-dot[data-slider-id="${this.sliderId}"][data-index="${index}"]`);
+      if (activeDot) activeDot.classList.add("active");
+      if (index === 0) {
+        if (mainImage) {
+          mainImage.style.visibility = "visible";
+          mainImage.style.opacity = "1";
+          mainImage.style.zIndex = "10";
+        }
+        additionalImages.forEach((img) => img.classList.remove("active"));
+      } else {
+        if (mainImage) {
+          mainImage.style.visibility = "hidden";
+          mainImage.style.opacity = "0";
+          mainImage.style.zIndex = "5";
+        }
+        additionalImages.forEach((img) => img.classList.remove("active"));
+        const activeImage = this.imageContainer.querySelector(`.product-slider-image[data-slider-id="${this.sliderId}"][data-index="${index}"]`);
+        if (activeImage) {
+          activeImage.classList.add("active");
+        } else if (mainImage) {
+          mainImage.style.visibility = "visible";
+          mainImage.style.opacity = "1";
+          mainImage.style.zIndex = "10";
+        }
+      }
+    }
+    prevSlide() {
+      const totalSlides = this.imageWrapper.querySelectorAll(`.product-slider-dot[data-slider-id="${this.sliderId}"]`).length;
+      const newIndex = (this.currentSlide - 1 + totalSlides) % totalSlides;
+      this.changeSlide(newIndex);
+    }
+    nextSlide() {
+      const totalSlides = this.imageWrapper.querySelectorAll(`.product-slider-dot[data-slider-id="${this.sliderId}"]`).length;
+      const newIndex = (this.currentSlide + 1) % totalSlides;
+      this.changeSlide(newIndex);
+    }
+    triggerHapticFeedback(intensity) {
+      try {
+        if (window.navigator && window.navigator.vibrate) {
+          switch (intensity) {
+            case "light":
+              window.navigator.vibrate(10);
+              break;
+            case "medium":
+              window.navigator.vibrate(25);
+              break;
+            case "strong":
+              window.navigator.vibrate([10, 20, 30]);
+              break;
+          }
+        }
+      } catch (e) {
+      }
+    }
+  };
+  var productCardEnhancer = new ProductCardEnhancer();
+
+  // index.js
+  window.productRecommendations = product_recommendations_default;
+  window.redisService = redisService;
+  var onReady = (fn) => document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", fn) : fn();
+  function runHomepageInjection() {
+    if (!document.body.classList.contains("index")) {
+      console.log("[Algolia Bundle] Not on homepage, skipping category products injection");
+      return;
+    }
+    const ANCHOR_SELECTOR = ".app-inner";
+    const ELEMENT_TAG = "mahaba-category-products";
+    function injectElement() {
+      const anchor = document.querySelector(ANCHOR_SELECTOR);
+      if (anchor && !anchor.querySelector(ELEMENT_TAG)) {
+        try {
+          console.log(`[Algolia Bundle] Found ${ANCHOR_SELECTOR}, injecting ${ELEMENT_TAG}...`);
+          const newElement = document.createElement(ELEMENT_TAG);
+          const footer = document.querySelector(".store-footer");
+          if (footer) {
+            anchor.insertBefore(newElement, footer);
+          } else {
+            anchor.appendChild(newElement);
+          }
+          console.log("\u2705 [Algolia Bundle] Homepage category component injected successfully");
+          return true;
+        } catch (e) {
+          console.error("[Algolia Bundle] Error during injection:", e);
+          return true;
+        }
+      }
+      return false;
+    }
+    if (injectElement()) {
+      return;
+    }
+    console.log(`[Algolia Bundle] ${ANCHOR_SELECTOR} not found, waiting for async load...`);
+    const observer = new MutationObserver((mutations, obs) => {
+      const hasAddedNodes = mutations.some((m) => m.addedNodes.length > 0);
+      if (hasAddedNodes && injectElement()) {
+        obs.disconnect();
+      }
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+  onReady(() => {
+    runHomepageInjection();
+    const isProductPage = document.querySelector('[id^="product-"]');
+    if (isProductPage) {
+      setTimeout(() => {
+        product_recommendations_default.initialize();
+        console.log("\u2705 [Algolia Bundle] Product recommendations initialized");
+      }, 3e3);
+    }
+    console.log("\u2705 [Algolia Bundle] Loaded successfully");
+  });
+})();

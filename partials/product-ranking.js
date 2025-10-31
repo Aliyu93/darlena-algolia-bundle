@@ -152,6 +152,7 @@ class ProductRanking extends HTMLElement {
         const data = await dataPromise;
         clearTimeout(this.timeout);
         console.log('[PR Element] Redis data received:', data?.objectIDs?.length, 'products');
+        console.log('[PR Element] Redis product IDs:', data.objectIDs);
 
         if (!data?.objectIDs?.length) {
             console.warn('[PR Element] No products from Redis, restoring original');

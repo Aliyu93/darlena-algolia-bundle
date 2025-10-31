@@ -304,21 +304,10 @@ class ProductRanking extends HTMLElement {
     }
     
     async waitForSalla() {
-        console.log('[ProductRanking] Checking for Salla framework...');
-        if (window.salla) {
-            console.log('[ProductRanking] Salla framework already loaded');
-            return;
-        }
-        console.log('[ProductRanking] Waiting for salla::ready event (max 3s timeout)');
+        if (window.salla) return;
         return new Promise(resolve => {
-            document.addEventListener('salla::ready', () => {
-                console.log('[ProductRanking] salla::ready event received');
-                resolve();
-            }, {once: true});
-            setTimeout(() => {
-                console.warn('[ProductRanking] Salla wait timeout after 3 seconds');
-                resolve();
-            }, 3000);
+            document.addEventListener('salla::ready', resolve, {once: true});
+            setTimeout(resolve, 3000);
         });
     }
     

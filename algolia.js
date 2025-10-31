@@ -1200,6 +1200,115 @@ var AlgoliaBundle = (() => {
   var LOG_PREFIX = "[YouTube Opt-In]";
   var debug = (...args) => console.log(LOG_PREFIX, ...args);
   var YOUTUBE_REGEX = /\/\/(www\.)?(youtube\.com|youtube-nocookie\.com|youtu\.be)\//i;
+  var youtubeStylesInjected = false;
+  function injectYoutubePlaceholderStyles() {
+    if (youtubeStylesInjected || typeof document === "undefined") return;
+    const style = document.createElement("style");
+    style.id = "youtube-placeholder-styles";
+    style.textContent = `
+    .yt-placeholder {
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      margin: 1rem 0;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      border: none;
+      padding: 0;
+      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+      transition: background 0.35s ease;
+    }
+    .yt-placeholder__thumb {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.35s ease, filter 0.3s ease;
+      z-index: 0;
+    }
+    .yt-placeholder__overlay {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 9999px;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(8px);
+    }
+    .yt-placeholder__icon {
+      position: relative;
+      width: 3rem;
+      height: 3rem;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+    .yt-placeholder__icon::before {
+      content: '';
+      display: inline-block;
+      width: 0;
+      height: 0;
+      border-style: solid;
+      border-width: 0.55rem 0 0.55rem 0.95rem;
+      border-color: transparent transparent transparent #1f1f1f;
+      margin-left: 0.2rem;
+    }
+    .yt-placeholder__label {
+      font-size: 1rem;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .yt-placeholder:hover {
+      background: linear-gradient(135deg, #c62828 0%, #e53935 100%);
+    }
+    .yt-placeholder:hover .yt-placeholder__thumb {
+      transform: scale(1.03);
+      filter: brightness(0.75);
+    }
+    .yt-placeholder:hover .yt-placeholder__overlay {
+      background: rgba(0, 0, 0, 0.7);
+    }
+    .yt-placeholder:focus-visible {
+      outline: 3px solid #c62828;
+      outline-offset: 3px;
+    }
+    .yt-placeholder:focus-visible .yt-placeholder__overlay {
+      background: rgba(0, 0, 0, 0.75);
+    }
+    @media (max-width: 640px) {
+      .yt-placeholder__overlay {
+        padding: 0.6rem 1rem;
+        gap: 0.6rem;
+      }
+      .yt-placeholder__icon {
+        width: 2.5rem;
+        height: 2.5rem;
+      }
+      .yt-placeholder__icon::before {
+        border-width: 0.45rem 0 0.45rem 0.75rem;
+      }
+      .yt-placeholder__label {
+        font-size: 0.9rem;
+      }
+    }
+  `;
+    document.head.appendChild(style);
+    youtubeStylesInjected = true;
+  }
   function normalizeYoutubeUrl(url) {
     if (!url) return "";
     const videoId = extractVideoId(url);
@@ -1223,6 +1332,7 @@ var AlgoliaBundle = (() => {
     return null;
   }
   function createPlaceholderButton(videoUrl, options = {}) {
+    injectYoutubePlaceholderStyles();
     const button = document.createElement("button");
     button.type = "button";
     button.className = "yt-placeholder";
@@ -1241,11 +1351,17 @@ var AlgoliaBundle = (() => {
       button.dataset.ytThumbSrc = thumbnailUrl;
       button.appendChild(img);
     }
+    const overlay = document.createElement("span");
+    overlay.className = "yt-placeholder__overlay";
     const icon = document.createElement("span");
     icon.className = "yt-placeholder__icon";
     icon.setAttribute("aria-hidden", "true");
-    icon.textContent = "\u25B6";
-    button.appendChild(icon);
+    overlay.appendChild(icon);
+    const label = document.createElement("span");
+    label.className = "yt-placeholder__label";
+    label.textContent = "\u0645\u0634\u0627\u0647\u062F\u0629 \u0641\u064A\u062F\u064A\u0648 \u0627\u0644\u0645\u0646\u062A\u062C";
+    overlay.appendChild(label);
+    button.appendChild(overlay);
     return button;
   }
   var thumbnailObserver = null;
@@ -1483,6 +1599,7 @@ var AlgoliaBundle = (() => {
   }
   function init() {
     debug("Initializing module");
+    injectYoutubePlaceholderStyles();
     initYouTubeOptIn();
     scanAndReplaceExistingIframes();
     setupDynamicHandlers();
@@ -2037,7 +2154,124 @@ var AlgoliaBundle = (() => {
       subtree: true
     });
   }
+  function injectCartAddonsStyles() {
+    if (document.getElementById("cart-addons-slider-styles")) return;
+    const style = document.createElement("style");
+    style.id = "cart-addons-slider-styles";
+    style.textContent = `
+    cart-addons-slider.cart-addons-wrapper {
+      position: relative;
+      margin-top: 1rem;
+      overflow: hidden;
+      border-radius: 0.5rem;
+      border: 1px solid rgba(229, 231, 235, 1);
+      background-color: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      display: block;
+    }
+    cart-addons-slider .cart-addons-title {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+      font-weight: 500;
+      background-color: #f9fafb;
+      color: #111827;
+      border-bottom: 1px solid rgba(229, 231, 235, 1);
+    }
+    cart-addons-slider salla-products-list {
+      opacity: 1;
+      transition: opacity 0.3s ease-in-out;
+      display: block;
+    }
+    cart-addons-slider .s-products-list-wrapper {
+      display: flex !important;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding: 0.75rem 1rem 0.5rem;
+      scroll-behavior: smooth;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    cart-addons-slider .s-products-list-wrapper::-webkit-scrollbar {
+      display: none;
+    }
+    cart-addons-slider .s-product-card-entry {
+      flex: none;
+      width: 160px;
+      scroll-snap-align: start;
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+    cart-addons-slider .s-product-card-image {
+      position: relative;
+      aspect-ratio: 2 / 3;
+      height: auto !important;
+    }
+    cart-addons-slider .s-product-card-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 1 !important;
+    }
+    cart-addons-slider .s-product-card-content {
+      padding: 0.25rem;
+    }
+    cart-addons-slider .s-product-card-content .s-product-card-content-title {
+      margin-bottom: 0.125rem;
+      font-size: 0.75rem;
+      line-height: 1rem;
+    }
+    cart-addons-slider .s-product-card-content .s-product-card-content-title a {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    cart-addons-slider .s-product-card-content .s-product-card-content-sub {
+      font-size: 0.75rem;
+      line-height: 1rem;
+      gap: 0.125rem;
+    }
+    cart-addons-slider .s-product-card-content .s-product-card-sale-price h4,
+    cart-addons-slider .s-product-card-content .s-product-card-sale-price span {
+      font-size: 0.75rem;
+      line-height: 1rem;
+    }
+    cart-addons-slider .s-product-card-content .s-product-card-content-footer {
+      margin-top: 0.125rem;
+    }
+    cart-addons-slider .s-product-card-content .s-product-card-content-footer salla-button {
+      transform: scale(0.75);
+      margin-left: -0.75rem;
+      margin-right: -0.75rem;
+    }
+    cart-addons-slider .touch-indicator {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 2.5rem;
+      height: 0.25rem;
+      background-color: rgba(229, 231, 235, 1);
+      opacity: 0.6;
+      border-radius: 9999px;
+      transform: translateX(-50%);
+      margin-bottom: 0.25rem;
+    }
+    @media (min-width: 768px) {
+      cart-addons-slider .touch-indicator {
+        display: none;
+      }
+    }
+  `;
+    document.head.appendChild(style);
+  }
   function runCartAddonsInjection() {
+    injectCartAddonsStyles();
     const ensure = () => {
       const submitButton = document.querySelector("#cart-submit");
       if (!submitButton) return false;
